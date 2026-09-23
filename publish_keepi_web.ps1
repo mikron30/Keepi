@@ -4,12 +4,89 @@ param(
 
 $ErrorActionPreference = "Stop"
 
+$HostingTarget = "keepi-site"
+$HostingCandidates = @(
+    "keepi",
+    "keepiapp",
+    "getkeepi",
+    "keepiweb",
+    "mykeepi",
+    "keepiglobal"
+)
+
 function Require-Command([string]$Name, [string]$HelpText) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
         Write-Host "Missing required command: $Name" -ForegroundColor Red
         Write-Host $HelpText -ForegroundColor Yellow
         exit 1
     }
+}
+
+function Get-ExistingHostingSites([string]$ProjectId) {
+    $raw = firebase.cmd hosting:sites:list --project "$ProjectId" --json | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        return @()
+    }
+
+    try {
+        $json = $raw | ConvertFrom-Json
+
+        if ($null -ne $json.result -and $null -ne $json.result.sites) {
+            return @($json.result.sites)
+        }
+
+        if ($null -ne $json.result -and $json.result -is [System.Array]) {
+            return @($json.result)
+        }
+
+        return @()
+    }
+    catch {
+        return @()
+    }
+}
+
+function Resolve-HostingSite([string]$ProjectId, [string]$RepoPath) {
+    $siteFile = Join-Path $RepoPath ".keepi-hosting-site"
+
+    if (Test-Path $siteFile) {
+        $saved = (Get-Content $siteFile -Raw).Trim()
+        if ($saved) {
+            Write-Host "Using saved Keepi Hosting site: $saved" -ForegroundColor Green
+            return $saved
+        }
+    }
+
+    $existingSites = Get-ExistingHostingSites -ProjectId $ProjectId
+
+    foreach ($candidate in $HostingCandidates) {
+        $found = $existingSites | Where-Object {
+            $_.name -eq $candidate -or
+            $_.site -eq $candidate -or
+            $_.siteId -eq $candidate
+        } | Select-Object -First 1
+
+        if ($found) {
+            Set-Content -Path $siteFile -Value $candidate -Encoding ascii
+            Write-Host "Using existing Keepi Hosting site: $candidate" -ForegroundColor Green
+            return $candidate
+        }
+    }
+
+    foreach ($candidate in $HostingCandidates) {
+        Write-Host "Trying Hosting address: https://$candidate.web.app" -ForegroundColor Cyan
+
+        firebase.cmd hosting:sites:create "$candidate" --project "$ProjectId" | Out-Host
+        if ($LASTEXITCODE -eq 0) {
+            Set-Content -Path $siteFile -Value $candidate -Encoding ascii
+            Write-Host "Reserved: https://$candidate.web.app" -ForegroundColor Green
+            return $candidate
+        }
+
+        Write-Host "'$candidate' is unavailable. Trying the next name..." -ForegroundColor Yellow
+    }
+
+    throw "Could not reserve any of the short Keepi Hosting names. Add another candidate to publish_keepi_web.ps1."
 }
 
 Write-Host ""
@@ -48,18 +125,32 @@ if ($projectId -like "matzav*") {
 Write-Host "Firebase project: $projectId" -ForegroundColor Green
 
 Write-Host ""
+Write-Host "Finding the shortest available international Keepi address..." -ForegroundColor Cyan
+$siteId = Resolve-HostingSite -ProjectId $projectId -RepoPath $ProjectPath
+
+Write-Host ""
+Write-Host "Connecting Firebase Hosting target '$HostingTarget' to '$siteId'..." -ForegroundColor Cyan
+firebase.cmd target:apply hosting "$HostingTarget" "$siteId" --project "$projectId" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "Could not configure Firebase Hosting target."
+}
+
+Write-Host ""
 Write-Host "Building Flutter Web..." -ForegroundColor Cyan
 flutter pub get
 flutter build web --release
+if ($LASTEXITCODE -ne 0) {
+    throw "Flutter Web build failed."
+}
 
 Write-Host ""
 Write-Host "Deploying to Firebase Hosting..." -ForegroundColor Cyan
-firebase.cmd deploy --only "hosting" --project "$projectId"
+firebase.cmd deploy --only "hosting:$HostingTarget" --project "$projectId" | Out-Host
 if ($LASTEXITCODE -ne 0) {
     throw "Firebase Hosting deployment failed."
 }
 
-$url = "https://$projectId.web.app"
+$url = "https://$siteId.web.app"
 
 Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
