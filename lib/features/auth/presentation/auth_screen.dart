@@ -136,8 +136,6 @@ class _AuthScreenState extends State<AuthScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -156,13 +154,13 @@ class _AuthScreenState extends State<AuthScreen> {
                         children: [
                           Align(
                             alignment: Alignment.center,
-                            child: CircleAvatar(
-                              radius: 42,
-                              backgroundColor: colorScheme.primaryContainer,
-                              child: Icon(
-                                Icons.inventory_2_outlined,
-                                size: 42,
-                                color: colorScheme.primary,
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(24),
+                              child: Image.asset(
+                                'assets/images/keepi_icon.png',
+                                width: 108,
+                                height: 108,
+                                fit: BoxFit.cover,
                               ),
                             ),
                           ),
