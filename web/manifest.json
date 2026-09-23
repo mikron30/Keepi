@@ -3,33 +3,17 @@
   "short_name": "Keepi",
   "start_url": ".",
   "display": "standalone",
-  "background_color": "#F7F8F6",
-  "theme_color": "#2E7D5A",
+  "background_color": "#101412",
+  "theme_color": "#08785E",
   "description": "Know what you have, what it is worth, and who nearby needs it.",
   "orientation": "portrait-primary",
   "prefer_related_applications": false,
   "icons": [
     {
-      "src": "icons/Icon-192.png",
-      "sizes": "192x192",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/Icon-512.png",
-      "sizes": "512x512",
-      "type": "image/png"
-    },
-    {
-      "src": "icons/Icon-maskable-192.png",
+      "src": "assets/assets/images/keepi_icon.png",
       "sizes": "192x192",
       "type": "image/png",
-      "purpose": "maskable"
-    },
-    {
-      "src": "icons/Icon-maskable-512.png",
-      "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "maskable"
+      "purpose": "any maskable"
     }
   ]
 }
