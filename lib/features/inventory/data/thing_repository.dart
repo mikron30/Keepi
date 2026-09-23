@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
@@ -65,12 +66,28 @@ class ThingRepository {
           'users/${user.uid}/things/${document.id}/original.$extension',
         );
 
-    await storageRef.putData(
-      imageBytes,
-      SettableMetadata(contentType: mimeType),
-    );
+    await storageRef
+        .putData(
+          imageBytes,
+          SettableMetadata(contentType: mimeType),
+        )
+        .timeout(
+          const Duration(seconds: 30),
+          onTimeout: () {
+            throw TimeoutException(
+              'Photo upload timed out. Check Firebase Storage setup and rules.',
+            );
+          },
+        );
 
-    final downloadUrl = await storageRef.getDownloadURL();
+    final downloadUrl = await storageRef.getDownloadURL().timeout(
+      const Duration(seconds: 15),
+      onTimeout: () {
+        throw TimeoutException(
+          'Could not get the uploaded photo URL from Firebase Storage.',
+        );
+      },
+    );
     final now = FieldValue.serverTimestamp();
 
     await document.set({
@@ -110,7 +127,14 @@ class ThingRepository {
         'confidence': recognition.confidence,
         'model': 'gemini-3.8-flash',
       },
-    });
+    }).timeout(
+      const Duration(seconds: 20),
+      onTimeout: () {
+        throw TimeoutException(
+          'Firestore save timed out. Check Firestore setup and rules.',
+        );
+      },
+    );
 
     return document.id;
   }
