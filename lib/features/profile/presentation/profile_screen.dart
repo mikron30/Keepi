@@ -1,18 +1,17 @@
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../core/firebase/firebase_providers.dart';
 import '../../../core/theme/theme_preference.dart';
 import '../../auth/data/auth_service.dart';
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends StatelessWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final firebaseReady = ref.watch(firebaseReadyProvider);
-    final user = FirebaseAuth.instance.currentUser;
+  Widget build(BuildContext context) {
+    final firebaseReady = Firebase.apps.isNotEmpty;
+    final user = firebaseReady ? FirebaseAuth.instance.currentUser : null;
 
     return Scaffold(
       appBar: AppBar(title: const Text('Profile')),
@@ -24,9 +23,7 @@ class ProfileScreen extends ConsumerWidget {
               leading: CircleAvatar(
                 backgroundImage:
                     user?.photoURL != null ? NetworkImage(user!.photoURL!) : null,
-                child: user?.photoURL == null
-                    ? Text(_initialFor(user))
-                    : null,
+                child: user?.photoURL == null ? Text(_initialFor(user)) : null,
               ),
               title: Text(
                 user?.displayName?.trim().isNotEmpty == true
@@ -98,9 +95,11 @@ class ProfileScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           OutlinedButton.icon(
-            onPressed: () async {
-              await AuthService().signOut();
-            },
+            onPressed: firebaseReady
+                ? () async {
+                    await AuthService().signOut();
+                  }
+                : null,
             icon: const Icon(Icons.logout),
             label: const Text('Sign out'),
           ),
