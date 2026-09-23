@@ -266,6 +266,9 @@ if ($LASTEXITCODE -ne 0) {
     throw "FlutterFire configuration failed."
 }
 
+Write-Host "Restoring repository Firebase Hosting config after FlutterFire..." -ForegroundColor Cyan
+git restore -- firebase.json
+
 Write-Step "9/10 - Analyze and test"
 flutter analyze
 flutter test
