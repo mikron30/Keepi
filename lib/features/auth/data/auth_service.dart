@@ -56,49 +56,52 @@ class AuthService {
     return credential;
   }
 
-  Future<UserCredential> signInWithGoogle() async {
-    UserCredential credential;
+  Future<void> signInWithGoogle() async {
+    final provider = GoogleAuthProvider()
+      ..setCustomParameters({
+        'prompt': 'select_account',
+      });
 
     if (kIsWeb) {
-      final provider = GoogleAuthProvider();
-      credential = await _auth.signInWithPopup(provider);
-    } else {
-      if (!_googleInitialized) {
-        await GoogleSignIn.instance.initialize();
-        _googleInitialized = true;
-      }
-
-      final googleUser = await GoogleSignIn.instance.authenticate();
-      final googleAuth = googleUser.authentication;
-      final idToken = googleAuth.idToken;
-
-      if (idToken == null) {
-        throw FirebaseAuthException(
-          code: 'google-token-missing',
-          message: 'Google did not return an ID token.',
-        );
-      }
-
-      final googleCredential = GoogleAuthProvider.credential(
-        idToken: idToken,
-      );
-
-      credential = await _auth.signInWithCredential(googleCredential);
+      // Redirect is more reliable than popups on mobile browsers/PWA.
+      await _auth.signInWithRedirect(provider);
+      return;
     }
 
+    if (!_googleInitialized) {
+      await GoogleSignIn.instance.initialize();
+      _googleInitialized = true;
+    }
+
+    final googleUser = await GoogleSignIn.instance.authenticate();
+    final googleAuth = googleUser.authentication;
+    final idToken = googleAuth.idToken;
+
+    if (idToken == null) {
+      throw FirebaseAuthException(
+        code: 'google-token-missing',
+        message: 'Google did not return an ID token.',
+      );
+    }
+
+    final googleCredential = GoogleAuthProvider.credential(
+      idToken: idToken,
+    );
+
+    final credential = await _auth.signInWithCredential(googleCredential);
     await _ensureUserProfile(credential.user);
-    return credential;
   }
 
-  Future<UserCredential> signInWithApple() async {
+  Future<void> signInWithApple() async {
     final provider = AppleAuthProvider();
 
-    final credential = kIsWeb
-        ? await _auth.signInWithPopup(provider)
-        : await _auth.signInWithProvider(provider);
+    if (kIsWeb) {
+      await _auth.signInWithRedirect(provider);
+      return;
+    }
 
+    final credential = await _auth.signInWithProvider(provider);
     await _ensureUserProfile(credential.user);
-    return credential;
   }
 
   Future<void> sendPasswordReset(String email) async {
@@ -115,6 +118,10 @@ class AuthService {
         // Firebase sign-out already completed.
       }
     }
+  }
+
+  Future<void> ensureCurrentUserProfile() async {
+    await _ensureUserProfile(_auth.currentUser);
   }
 
   Future<void> _ensureUserProfile(
