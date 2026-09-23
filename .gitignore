@@ -47,3 +47,6 @@ ios/Flutter/flutter_export_environment.sh
 
 # Local Keepi Firebase project selection
 .keepi-firebase-project
+
+# Local Firebase Hosting site selection
+.keepi-hosting-site
