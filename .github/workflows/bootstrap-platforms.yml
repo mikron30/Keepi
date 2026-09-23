@@ -1,0 +1,75 @@
+name: Bootstrap Flutter platforms
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - '.github/workflows/bootstrap-platforms.yml'
+      - 'pubspec.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  generate-platforms:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Check whether platform shells already exist
+        id: check
+        shell: bash
+        run: |
+          if [ -d android ] && [ -d ios ] && [ -d web ]; then
+            echo "needed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "needed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Install Flutter
+        if: steps.check.outputs.needed == 'true'
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Generate platform shells
+        if: steps.check.outputs.needed == 'true'
+        shell: bash
+        run: |
+          rm -rf /tmp/keepi_flutter
+          flutter create /tmp/keepi_flutter             --project-name keepi             --org com.keepi             --platforms=android,ios,web
+
+          if [ ! -d android ]; then
+            cp -R /tmp/keepi_flutter/android ./android
+          fi
+
+          if [ ! -d ios ]; then
+            cp -R /tmp/keepi_flutter/ios ./ios
+          fi
+
+          if [ ! -d web ]; then
+            cp -R /tmp/keepi_flutter/web ./web
+          fi
+
+          if [ ! -f .metadata ]; then
+            cp /tmp/keepi_flutter/.metadata ./.metadata
+          fi
+
+      - name: Commit generated shells
+        if: steps.check.outputs.needed == 'true'
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add android ios web .metadata
+          if git diff --cached --quiet; then
+            echo "No generated changes."
+            exit 0
+          fi
+          git commit -m "Generate Flutter Android iOS and Web shells"
+          git push
