@@ -46,6 +46,9 @@ function Add-PubCacheToPath {
 
 function Get-FirebaseProjects {
     $raw = firebase.cmd projects:list --json | Out-String
+    if ($LASTEXITCODE -ne 0) {
+        throw "Could not list Firebase projects."
+    }
     $json = $raw | ConvertFrom-Json
 
     if ($null -ne $json.result) {
@@ -106,15 +109,14 @@ function Resolve-KeepiFirebaseProject {
     foreach ($candidate in $KeepiFirebaseProjectCandidates) {
         Write-Host "Trying Firebase project id: $candidate"
 
-        try {
-            firebase.cmd projects:create $candidate --display-name $KeepiFirebaseDisplayName
+        firebase.cmd projects:create $candidate --display-name $KeepiFirebaseDisplayName | Out-Host
+        if ($LASTEXITCODE -eq 0) {
             Set-Content -Path $localProjectFile -Value $candidate -Encoding ascii
             Write-Host "Created dedicated Keepi Firebase project: $candidate" -ForegroundColor Green
             return $candidate
         }
-        catch {
-            Write-Host "Could not create '$candidate'; trying the next dedicated Keepi id..." -ForegroundColor Yellow
-        }
+
+        Write-Host "Could not create '$candidate'; trying the next dedicated Keepi id..." -ForegroundColor Yellow
     }
 
     throw "Could not create a dedicated Firebase project for Keepi. No Matzav project was modified by this script."
@@ -212,7 +214,10 @@ Write-Host "Matzav Firebase project will not be used." -ForegroundColor Green
 
 Write-Step "8/10 - Configuring Firebase for Keepi only"
 Write-Host "Registering Android, iOS and Web apps inside: $projectId" -ForegroundColor Cyan
-& $flutterfireCommand configure --project=$projectId --platforms=android,ios,web --yes
+& $flutterfireCommand configure --project "$projectId" --platforms "android,ios,web" --yes
+if ($LASTEXITCODE -ne 0) {
+    throw "FlutterFire configuration failed."
+}
 
 Write-Step "9/10 - Analyze and test"
 flutter analyze
@@ -221,7 +226,10 @@ flutter test
 Write-Step "10/10 - Firebase rules"
 if (-not $SkipFirebaseDeploy) {
     try {
-        firebase.cmd deploy --only firestore:rules,storage --project $projectId
+        firebase.cmd deploy --only "firestore:rules,storage" --project "$projectId" | Out-Host
+        if ($LASTEXITCODE -ne 0) {
+            throw "Firebase rules deployment failed with exit code $LASTEXITCODE."
+        }
         Write-Host "Firebase rules deployed." -ForegroundColor Green
     }
     catch {
