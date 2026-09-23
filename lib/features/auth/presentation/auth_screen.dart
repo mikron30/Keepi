@@ -63,10 +63,12 @@ class _AuthScreenState extends State<AuthScreen> {
   }
 
   Future<void> _google() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     await _runAuth(_authService.signInWithGoogle);
   }
 
   Future<void> _apple() async {
+    FocusManager.instance.primaryFocus?.unfocus();
     await _runAuth(_authService.signInWithApple);
   }
 
@@ -396,6 +398,12 @@ String _friendlyAuthError(FirebaseAuthException error) {
     case 'popup-closed-by-user':
       return 'Sign-in was cancelled.';
     default:
-      return error.message ?? 'Authentication failed.';
+      final message = error.message?.trim();
+      if (message != null &&
+          message.isNotEmpty &&
+          message.toLowerCase() != 'error') {
+        return '\$message (\${error.code})';
+      }
+      return 'Authentication failed (\${error.code}).';
   }
 }
