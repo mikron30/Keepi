@@ -1,40 +1,285 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
-class MyThingsScreen extends StatelessWidget {
+import '../data/thing_repository.dart';
+import '../domain/thing.dart';
+
+class MyThingsScreen extends StatefulWidget {
   const MyThingsScreen({super.key});
+
+  @override
+  State<MyThingsScreen> createState() => _MyThingsScreenState();
+}
+
+class _MyThingsScreenState extends State<MyThingsScreen> {
+  late final ThingRepository _repository;
+
+  @override
+  void initState() {
+    super.initState();
+    _repository = ThingRepository();
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('My Things')),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.inventory_2_outlined, size: 72),
-              const SizedBox(height: 18),
-              Text(
-                'Nothing here yet',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                      fontWeight: FontWeight.w700,
-                    ),
-              ),
-              const SizedBox(height: 8),
-              const Text(
-                'Add your first Thing. Keepi will progressively identify, categorize and value it automatically.',
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 20),
-              FilledButton.icon(
-                onPressed: () => context.go('/add'),
-                icon: const Icon(Icons.camera_alt_outlined),
-                label: const Text('Add a Thing'),
-              ),
-            ],
+      appBar: AppBar(
+        title: const Text('My Things'),
+        actions: [
+          IconButton(
+            tooltip: 'Add a Thing',
+            onPressed: () => context.go('/add'),
+            icon: const Icon(Icons.add),
           ),
+        ],
+      ),
+      body: StreamBuilder<List<Thing>>(
+        stream: _repository.watchMyThings(),
+        builder: (context, snapshot) {
+          if (snapshot.hasError) {
+            return _ErrorState(
+              message: snapshot.error.toString(),
+            );
+          }
+
+          if (!snapshot.hasData) {
+            return const Center(child: CircularProgressIndicator());
+          }
+
+          final things = snapshot.data!;
+          if (things.isEmpty) {
+            return _EmptyState(
+              onAdd: () => context.go('/add'),
+            );
+          }
+
+          return RefreshIndicator(
+            onRefresh: () async {
+              await Future<void>.delayed(const Duration(milliseconds: 350));
+            },
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
+              itemCount: things.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              itemBuilder: (context, index) {
+                return _ThingCard(thing: things[index]);
+              },
+            ),
+          );
+        },
+      ),
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () => context.go('/add'),
+        icon: const Icon(Icons.camera_alt_outlined),
+        label: const Text('Add'),
+      ),
+    );
+  }
+}
+
+class _ThingCard extends StatelessWidget {
+  const _ThingCard({required this.thing});
+
+  final Thing thing;
+
+  @override
+  Widget build(BuildContext context) {
+    final brand = thing.attributes['brand']?.toString().trim() ?? '';
+    final model = thing.attributes['model']?.toString().trim() ?? '';
+    final confidence = thing.attributes['aiConfidence'];
+    final value = thing.estimatedCurrentValue;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: SizedBox(
+                width: 92,
+                height: 92,
+                child: thing.photoUrls.isEmpty
+                    ? const ColoredBox(
+                        color: Colors.black12,
+                        child: Icon(Icons.inventory_2_outlined, size: 34),
+                      )
+                    : Image.network(
+                        thing.photoUrls.first,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const ColoredBox(
+                          color: Colors.black12,
+                          child: Icon(Icons.broken_image_outlined),
+                        ),
+                      ),
+              ),
+            ),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    thing.name,
+                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                          fontWeight: FontWeight.w800,
+                        ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    [
+                      _pretty(thing.categoryId),
+                      if (thing.subcategoryId?.isNotEmpty == true)
+                        thing.subcategoryId!,
+                    ].join(' · '),
+                  ),
+                  if (brand.isNotEmpty || model.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      [brand, model]
+                          .where((value) => value.isNotEmpty)
+                          .join(' '),
+                    ),
+                  ],
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 6,
+                    children: [
+                      _SmallChip(
+                        icon: Icons.visibility_off_outlined,
+                        label: 'Private',
+                      ),
+                      if (value != null)
+                        _SmallChip(
+                          icon: Icons.sell_outlined,
+                          label: '₪${value.round()}',
+                        ),
+                      if (confidence != null)
+                        _SmallChip(
+                          icon: Icons.auto_awesome,
+                          label: 'AI $confidence%',
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  static String _pretty(String value) {
+    return value
+        .split('_')
+        .map((part) => part.isEmpty
+            ? part
+            : '${part[0].toUpperCase()}${part.substring(1)}')
+        .join(' ');
+  }
+}
+
+class _SmallChip extends StatelessWidget {
+  const _SmallChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
+      decoration: BoxDecoration(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 14),
+          const SizedBox(width: 5),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium,
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _EmptyState extends StatelessWidget {
+  const _EmptyState({required this.onAdd});
+
+  final VoidCallback onAdd;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.inventory_2_outlined, size: 72),
+            const SizedBox(height: 18),
+            Text(
+              'Nothing here yet',
+              style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Photograph your first Thing and let Keepi identify it.',
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 20),
+            FilledButton.icon(
+              onPressed: onAdd,
+              icon: const Icon(Icons.camera_alt_outlined),
+              label: const Text('Add a Thing'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ErrorState extends StatelessWidget {
+  const _ErrorState({required this.message});
+
+  final String message;
+
+  @override
+  Widget build(BuildContext context) {
+    return Center(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load My Things',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
