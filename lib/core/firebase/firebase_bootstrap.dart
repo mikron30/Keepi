@@ -49,7 +49,7 @@ class FirebaseBootstrap {
 
       if (kIsWeb) {
         await FirebaseAppCheck.instance.activate(
-          webProvider: ReCaptchaEnterpriseProvider(
+          providerWeb: ReCaptchaEnterpriseProvider(
             _webRecaptchaEnterpriseSiteKey,
           ),
         );
