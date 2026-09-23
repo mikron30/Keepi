@@ -185,13 +185,19 @@ if ($LASTEXITCODE -ne 0) {
 }
 
 Write-Host ""
+$commitId = (git rev-parse --short HEAD).Trim()
+Write-Host "Building Keepi commit: $commitId" -ForegroundColor Green
 Write-Host "Building Flutter Web with the Keepi Firebase configuration..." -ForegroundColor Cyan
 $firebaseDefines = Get-WebFirebaseDartDefines -RepoPath $ProjectPath
+flutter clean
 flutter pub get
 flutter build web --release @firebaseDefines
 if ($LASTEXITCODE -ne 0) {
     throw "Flutter Web build failed."
 }
+
+$versionText = "Keepi commit: $commitId`nPublished: $(Get-Date -Format o)"
+Set-Content -Path (Join-Path $ProjectPath "build\web\keepi-version.txt") -Value $versionText -Encoding ascii
 
 Write-Host ""
 Write-Host "Deploying to Firebase Hosting..." -ForegroundColor Cyan
@@ -206,6 +212,7 @@ Write-Host ""
 Write-Host "============================================" -ForegroundColor Green
 Write-Host "Keepi is live:" -ForegroundColor Green
 Write-Host $url -ForegroundColor Yellow
+Write-Host "Version check: $url/keepi-version.txt" -ForegroundColor Cyan
 Write-Host "============================================" -ForegroundColor Green
 
-Start-Process $url
+Start-Process "$url/?v=$commitId"
