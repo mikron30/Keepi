@@ -284,12 +284,16 @@ class _AddThingScreenState extends State<AddThingScreen> {
 
     if (lower.contains('storage') ||
         lower.contains('bucket') ||
-        lower.contains('object-not-found')) {
-      return 'Photo upload failed. Check that Firebase Storage is enabled for Keepi.';
+        lower.contains('object-not-found') ||
+        lower.contains('upload timed out')) {
+      return 'Photo upload could not finish. Open Firebase Console > Storage, '
+          'make sure Storage is enabled for Keepi, then publish the latest rules.';
     }
 
-    if (lower.contains('permission-denied')) {
-      return 'Firebase blocked the save. Deploy the latest Firestore and Storage rules.';
+    if (lower.contains('permission-denied') ||
+        lower.contains('firestore save timed out')) {
+      return 'Firebase blocked or could not finish the save. '
+          'Deploy the latest Firestore and Storage rules.';
     }
 
     return 'Could not save this Thing: $text';
