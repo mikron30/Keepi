@@ -44,3 +44,6 @@ ios/Flutter/flutter_export_environment.sh
 
 # Firebase local cache
 .firebase/
+
+# Local Keepi Firebase project selection
+.keepi-firebase-project
