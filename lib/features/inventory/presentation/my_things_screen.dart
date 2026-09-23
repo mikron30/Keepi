@@ -60,7 +60,7 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
             child: ListView.separated(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
               itemCount: things.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 10),
+              separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
                 return _ThingCard(thing: things[index]);
               },
@@ -108,7 +108,7 @@ class _ThingCard extends StatelessWidget {
                     : Image.network(
                         thing.photoUrls.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => const ColoredBox(
+                        errorBuilder: (_, _, _) => const ColoredBox(
                           color: Colors.black12,
                           child: Icon(Icons.broken_image_outlined),
                         ),
@@ -147,7 +147,7 @@ class _ThingCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      _SmallChip(
+                      const _SmallChip(
                         icon: Icons.visibility_off_outlined,
                         label: 'Private',
                       ),
