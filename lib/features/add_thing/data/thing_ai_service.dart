@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:typed_data';
 
@@ -34,6 +35,11 @@ class ThingAiService {
     'unknown',
   ];
 
+  static const _modelFallbacks = <String>[
+    'gemini-3.8-flash',
+    'gemini-3.5-flash-lite',
+  ];
+
   static Future<ThingRecognition> recognize({
     required Uint8List imageBytes,
     required String mimeType,
@@ -52,14 +58,6 @@ class ThingAiService {
         'confidence': Schema.integer(),
         'searchKeywords': Schema.array(items: Schema.string()),
       },
-    );
-
-    final model = FirebaseAI.googleAI().generativeModel(
-      model: 'gemini-3.8-flash',
-      generationConfig: GenerationConfig(
-        responseMimeType: 'application/json',
-        responseSchema: schema,
-      ),
     );
 
     const prompt = '''
@@ -83,23 +81,69 @@ Rules:
 - searchKeywords should contain useful English and Hebrew search terms when possible, plus brand/model if known.
 ''';
 
-    final response = await model.generateContent([
-      Content.multi([
-        const TextPart(prompt),
-        InlineDataPart(mimeType, imageBytes),
-      ]),
-    ]);
+    Object? lastError;
 
-    final text = response.text;
-    if (text == null || text.trim().isEmpty) {
-      throw StateError('AI returned an empty result.');
+    for (final modelName in _modelFallbacks) {
+      final model = FirebaseAI.googleAI().generativeModel(
+        model: modelName,
+        generationConfig: GenerationConfig(
+          responseMimeType: 'application/json',
+          responseSchema: schema,
+        ),
+      );
+
+      for (var attempt = 1; attempt <= 2; attempt++) {
+        try {
+          final response = await model.generateContent([
+            Content.multi([
+              const TextPart(prompt),
+              InlineDataPart(mimeType, imageBytes),
+            ]),
+          ]).timeout(const Duration(seconds: 35));
+
+          final text = response.text;
+          if (text == null || text.trim().isEmpty) {
+            throw StateError('AI returned an empty result.');
+          }
+
+          final decoded = jsonDecode(text);
+          if (decoded is! Map<String, dynamic>) {
+            throw StateError('AI returned an invalid recognition result.');
+          }
+
+          return ThingRecognition.fromJson(decoded);
+        } catch (error) {
+          lastError = error;
+
+          if (!_isTemporaryModelError(error)) {
+            rethrow;
+          }
+
+          if (attempt < 2) {
+            await Future<void>.delayed(
+              Duration(seconds: attempt * 2),
+            );
+          }
+        }
+      }
     }
 
-    final decoded = jsonDecode(text);
-    if (decoded is! Map<String, dynamic>) {
-      throw StateError('AI returned an invalid recognition result.');
-    }
+    throw StateError(
+      'Keepi AI is temporarily busy. Please try again in a moment. '
+      'Last error: ${lastError ?? 'unknown'}',
+    );
+  }
 
-    return ThingRecognition.fromJson(decoded);
+  static bool _isTemporaryModelError(Object error) {
+    final message = error.toString().toLowerCase();
+
+    return message.contains('high demand') ||
+        message.contains('server error [500]') ||
+        message.contains('code": 500') ||
+        message.contains('status": "internal') ||
+        message.contains('503') ||
+        message.contains('unavailable') ||
+        message.contains('deadline') ||
+        message.contains('timeout');
   }
 }
