@@ -8,9 +8,24 @@ class HomeScreen extends StatelessWidget {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text(
-          'Keepi',
-          style: TextStyle(fontWeight: FontWeight.w800, fontSize: 28),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ClipRRect(
+              borderRadius: BorderRadius.circular(9),
+              child: Image.asset(
+                'assets/images/keepi_icon.png',
+                width: 36,
+                height: 36,
+                fit: BoxFit.cover,
+              ),
+            ),
+            const SizedBox(width: 10),
+            const Text(
+              'Keepi',
+              style: TextStyle(fontWeight: FontWeight.w800, fontSize: 28),
+            ),
+          ],
         ),
         actions: [
           IconButton(
