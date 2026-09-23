@@ -84,7 +84,7 @@ Rules:
     Object? lastError;
 
     for (final modelName in _modelFallbacks) {
-      final model = FirebaseAI.googleAI().generativeModel(
+      final model = FirebaseAI.agentPlatform().generativeModel(
         model: modelName,
         generationConfig: GenerationConfig(
           responseMimeType: 'application/json',
