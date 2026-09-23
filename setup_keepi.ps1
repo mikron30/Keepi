@@ -22,6 +22,53 @@ function Write-Step([string]$Message) {
     Write-Host "============================================================" -ForegroundColor DarkGray
 }
 
+function Get-WebFirebaseDartDefines([string]$RepoPath) {
+    $optionsPath = Join-Path $RepoPath "lib\firebase_options.dart"
+
+    if (-not (Test-Path $optionsPath)) {
+        throw "Missing lib\firebase_options.dart. Run setup_keepi.ps1 first."
+    }
+
+    $content = Get-Content $optionsPath -Raw
+    $webMatch = [regex]::Match(
+        $content,
+        "static const FirebaseOptions web = FirebaseOptions\((?<body>.*?)\n\s*\);",
+        [System.Text.RegularExpressions.RegexOptions]::Singleline
+    )
+
+    if (-not $webMatch.Success) {
+        throw "Could not read the Firebase Web configuration from lib\firebase_options.dart."
+    }
+
+    $body = $webMatch.Groups["body"].Value
+    $mapping = [ordered]@{
+        "apiKey" = "FIREBASE_API_KEY"
+        "appId" = "FIREBASE_APP_ID"
+        "messagingSenderId" = "FIREBASE_MESSAGING_SENDER_ID"
+        "projectId" = "FIREBASE_PROJECT_ID"
+        "authDomain" = "FIREBASE_AUTH_DOMAIN"
+        "storageBucket" = "FIREBASE_STORAGE_BUCKET"
+        "measurementId" = "FIREBASE_MEASUREMENT_ID"
+    }
+
+    $arguments = @()
+
+    foreach ($entry in $mapping.GetEnumerator()) {
+        $pattern = $entry.Key + "\s*:\s*'([^']*)'"
+        $match = [regex]::Match($body, $pattern)
+
+        if ($match.Success -and $match.Groups[1].Value) {
+            $arguments += "--dart-define=$($entry.Value)=$($match.Groups[1].Value)"
+        }
+    }
+
+    if (-not ($arguments | Where-Object { $_ -like "--dart-define=FIREBASE_API_KEY=*" })) {
+        throw "Firebase Web apiKey was not found."
+    }
+
+    return $arguments
+}
+
 function Require-Command([string]$Name, [string]$HelpText) {
     if (-not (Get-Command $Name -ErrorAction SilentlyContinue)) {
         Write-Host ""
@@ -248,6 +295,12 @@ Write-Host "Keepi setup completed." -ForegroundColor Green
 Write-Host "Folder:           $ProjectPath"
 Write-Host "Firebase project: $projectId"
 Write-Host "============================================================" -ForegroundColor Green
+Write-Host ""
+Write-Host "Authentication note:" -ForegroundColor Cyan
+Write-Host "Enable Email/Password and Google in Firebase Authentication > Sign-in method." -ForegroundColor Yellow
+Write-Host "Apple sign-in is already implemented in Keepi, but Apple Developer configuration is also required before native iPhone release." -ForegroundColor Yellow
+Write-Host "Firebase Authentication console:" -ForegroundColor Cyan
+Write-Host "https://console.firebase.google.com/project/$projectId/authentication/providers" -ForegroundColor Yellow
 
 if (Get-Command "code.cmd" -ErrorAction SilentlyContinue) {
     Write-Host "Opening Keepi in VS Code..."
@@ -256,8 +309,9 @@ if (Get-Command "code.cmd" -ErrorAction SilentlyContinue) {
 
 if ($RunTarget -eq "chrome") {
     Write-Host ""
-    Write-Host "Starting Keepi in Chrome. Press q in this window to stop Flutter." -ForegroundColor Cyan
-    flutter run -d chrome
+    Write-Host "Starting Keepi in Chrome with Firebase enabled. Press q in this window to stop Flutter." -ForegroundColor Cyan
+    $firebaseDefines = Get-WebFirebaseDartDefines -RepoPath $ProjectPath
+    flutter run -d chrome @firebaseDefines
 } else {
     Write-Host ""
     Write-Host "Run later with: flutter run -d chrome" -ForegroundColor Cyan
