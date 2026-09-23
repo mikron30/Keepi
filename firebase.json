@@ -6,6 +6,7 @@
     "rules": "storage.rules"
   },
   "hosting": {
+    "target": "keepi-site",
     "public": "build/web",
     "ignore": [
       "firebase.json",
