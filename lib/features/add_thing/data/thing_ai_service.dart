@@ -85,7 +85,7 @@ Rules:
 
     final response = await model.generateContent([
       Content.multi([
-        TextPart(prompt),
+        const TextPart(prompt),
         InlineDataPart(mimeType, imageBytes),
       ]),
     ]);
