@@ -200,6 +200,13 @@ $versionText = "Keepi commit: $commitId`nPublished: $(Get-Date -Format o)"
 Set-Content -Path (Join-Path $ProjectPath "build\web\keepi-version.txt") -Value $versionText -Encoding ascii
 
 Write-Host ""
+Write-Host "Deploying Firebase rules..." -ForegroundColor Cyan
+firebase.cmd deploy --only "firestore:rules,storage" --project "$projectId" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "Firebase Firestore/Storage rules deployment failed."
+}
+
+Write-Host ""
 Write-Host "Deploying to Firebase Hosting..." -ForegroundColor Cyan
 firebase.cmd deploy --only "hosting:$HostingTarget" --project "$projectId" | Out-Host
 if ($LASTEXITCODE -ne 0) {
