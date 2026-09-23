@@ -63,8 +63,9 @@ class AuthService {
       });
 
     if (kIsWeb) {
-      // Redirect is more reliable than popups on mobile browsers/PWA.
-      await _auth.signInWithRedirect(provider);
+      // Popup avoids the cross-origin redirect persistence problem on web.app.
+      final credential = await _auth.signInWithPopup(provider);
+      await _ensureUserProfile(credential.user);
       return;
     }
 
@@ -96,7 +97,8 @@ class AuthService {
     final provider = AppleAuthProvider();
 
     if (kIsWeb) {
-      await _auth.signInWithRedirect(provider);
+      final credential = await _auth.signInWithPopup(provider);
+      await _ensureUserProfile(credential.user);
       return;
     }
 
