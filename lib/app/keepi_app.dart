@@ -5,8 +5,21 @@ import '../core/theme/app_theme.dart';
 import '../core/theme/theme_preference.dart';
 import '../features/auth/presentation/auth_gate.dart';
 
-class KeepiApp extends StatelessWidget {
+class KeepiApp extends StatefulWidget {
   const KeepiApp({super.key});
+
+  @override
+  State<KeepiApp> createState() => _KeepiAppState();
+}
+
+class _KeepiAppState extends State<KeepiApp> {
+  @override
+  void initState() {
+    super.initState();
+
+    // Never delay the first Flutter frame for local preferences.
+    ThemePreference.load();
+  }
 
   @override
   Widget build(BuildContext context) {
