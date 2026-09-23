@@ -44,7 +44,7 @@ Write-Host "Project path: $ProjectPath"
 Write-Step "1/9 - Checking prerequisites"
 Require-Command "git.exe" "Install Git for Windows, then run this script again."
 Require-Command "flutter.bat" "Install Flutter and make sure flutter is in PATH."
-Require-Command "dart.exe" "Dart should come with Flutter. Run 'flutter doctor' if it is missing."
+Require-Command "dart.bat" "Dart should come with Flutter. Run 'flutter doctor' if it is missing."
 
 if (-not (Get-Command "npm.cmd" -ErrorAction SilentlyContinue)) {
     Write-Host "npm was not found." -ForegroundColor Yellow
@@ -54,7 +54,7 @@ if (-not (Get-Command "npm.cmd" -ErrorAction SilentlyContinue)) {
 
 Write-Host "Git:     $(git --version)"
 Write-Host "Flutter: $(flutter --version | Select-Object -First 1)"
-Write-Host "Dart:    $(dart --version 2>&1)"
+Write-Host "Dart:    $(dart.bat --version 2>&1)"
 
 Write-Step "2/9 - Installing/updating Firebase CLI"
 if (-not (Get-Command "firebase.cmd" -ErrorAction SilentlyContinue)) {
@@ -100,7 +100,7 @@ Write-Host "A browser window may open. Complete the Google/Firebase sign-in ther
 firebase.cmd login
 
 Write-Step "6/9 - Installing FlutterFire CLI"
-dart pub global activate flutterfire_cli
+dart.bat pub global activate flutterfire_cli
 Add-PubCacheToPath
 
 if (-not (Get-Command "flutterfire.bat" -ErrorAction SilentlyContinue) -and
