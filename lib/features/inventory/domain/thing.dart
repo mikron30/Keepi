@@ -1,3 +1,5 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
 enum ThingVisibility {
   private,
   friends,
@@ -71,6 +73,75 @@ class Thing {
   final String? locationLabel;
   final DateTime createdAt;
   final DateTime updatedAt;
+
+  factory Thing.fromMap(String id, Map<String, dynamic> data) {
+    DateTime parseDate(dynamic value) {
+      if (value is Timestamp) return value.toDate();
+      if (value is DateTime) return value;
+      if (value is String) {
+        return DateTime.tryParse(value) ?? DateTime.fromMillisecondsSinceEpoch(0);
+      }
+      return DateTime.fromMillisecondsSinceEpoch(0);
+    }
+
+    ThingCondition parseCondition(dynamic value) {
+      final text = value?.toString() ?? 'unknown';
+      return ThingCondition.values.firstWhere(
+        (item) => item.name == text,
+        orElse: () => ThingCondition.unknown,
+      );
+    }
+
+    ThingVisibility parseVisibility(dynamic value) {
+      final text = value?.toString() ?? 'private';
+      return ThingVisibility.values.firstWhere(
+        (item) => item.name == text,
+        orElse: () => ThingVisibility.private,
+      );
+    }
+
+    final actionNames = (data['enabledActions'] as List<dynamic>? ?? const [])
+        .map((value) => value.toString())
+        .toSet();
+
+    return Thing(
+      id: id,
+      ownerId: (data['ownerId'] ?? '').toString(),
+      name: (data['name'] ?? 'Unnamed Thing').toString(),
+      categoryId: (data['categoryId'] ?? 'other').toString(),
+      subcategoryId: data['subcategoryId']?.toString(),
+      description: data['description']?.toString(),
+      photoUrls: (data['photoUrls'] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList(),
+      attributes: Map<String, dynamic>.from(
+        data['attributes'] as Map? ?? const <String, dynamic>{},
+      ),
+      searchKeywords: (data['searchKeywords'] as List<dynamic>? ?? const [])
+          .map((value) => value.toString())
+          .toList(),
+      quantity: (data['quantity'] as num?)?.toInt() ?? 1,
+      condition: parseCondition(data['condition']),
+      visibility: parseVisibility(data['visibility']),
+      enabledActions: ThingAction.values
+          .where((action) => actionNames.contains(action.name))
+          .toSet(),
+      estimatedNewPrice: (data['estimatedNewPrice'] as num?)?.toDouble(),
+      estimatedCurrentValue:
+          (data['estimatedCurrentValue'] as num?)?.toDouble(),
+      expiryDate: data['expiryDate'] == null
+          ? null
+          : parseDate(data['expiryDate']),
+      openedAt:
+          data['openedAt'] == null ? null : parseDate(data['openedAt']),
+      latitude: (data['latitude'] as num?)?.toDouble(),
+      longitude: (data['longitude'] as num?)?.toDouble(),
+      geohash: data['geohash']?.toString(),
+      locationLabel: data['locationLabel']?.toString(),
+      createdAt: parseDate(data['createdAt']),
+      updatedAt: parseDate(data['updatedAt']),
+    );
+  }
 
   Map<String, dynamic> toMap() {
     return {
