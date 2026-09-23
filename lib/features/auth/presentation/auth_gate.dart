@@ -109,12 +109,13 @@ class _KeepiStartingScreen extends StatelessWidget {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              CircleAvatar(
-                radius: 42,
-                child: Icon(
-                  Icons.inventory_2_outlined,
-                  size: 42,
-                  color: Theme.of(context).colorScheme.primary,
+              ClipRRect(
+                borderRadius: BorderRadius.circular(22),
+                child: Image.asset(
+                  'assets/images/keepi_icon.png',
+                  width: 92,
+                  height: 92,
+                  fit: BoxFit.cover,
                 ),
               ),
               const SizedBox(height: 18),
