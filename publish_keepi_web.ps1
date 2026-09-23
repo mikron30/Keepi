@@ -151,6 +151,8 @@ Set-Location $ProjectPath
 
 Write-Host ""
 Write-Host "Updating repository..." -ForegroundColor Cyan
+Write-Host "Discarding generated firebase.json changes before pull..." -ForegroundColor DarkGray
+git restore -- firebase.json 2>$null
 git fetch origin
 git checkout main
 git pull --ff-only origin main
