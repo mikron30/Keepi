@@ -16,7 +16,9 @@ class _AuthScreenState extends State<AuthScreen> {
   final _nameController = TextEditingController();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  final _confirmController = TextEditingController();
+  final _nameFocus = FocusNode();
+  final _emailFocus = FocusNode();
+  final _passwordFocus = FocusNode();
   final _authService = AuthService();
 
   bool _registerMode = false;
@@ -37,7 +39,9 @@ class _AuthScreenState extends State<AuthScreen> {
     _nameController.dispose();
     _emailController.dispose();
     _passwordController.dispose();
-    _confirmController.dispose();
+    _nameFocus.dispose();
+    _emailFocus.dispose();
+    _passwordFocus.dispose();
     super.dispose();
   }
 
@@ -127,7 +131,6 @@ class _AuthScreenState extends State<AuthScreen> {
     setState(() {
       _registerMode = !_registerMode;
       _formKey.currentState?.reset();
-      _confirmController.clear();
     });
   }
 
@@ -190,7 +193,11 @@ class _AuthScreenState extends State<AuthScreen> {
                           if (_registerMode) ...[
                             TextFormField(
                               controller: _nameController,
+                              focusNode: _nameFocus,
                               textInputAction: TextInputAction.next,
+                              onFieldSubmitted: (_) {
+                                _emailFocus.requestFocus();
+                              },
                               autofillHints: const [AutofillHints.name],
                               decoration: const InputDecoration(
                                 labelText: 'Name',
@@ -207,8 +214,12 @@ class _AuthScreenState extends State<AuthScreen> {
                           ],
                           TextFormField(
                             controller: _emailController,
+                            focusNode: _emailFocus,
                             keyboardType: TextInputType.emailAddress,
                             textInputAction: TextInputAction.next,
+                            onFieldSubmitted: (_) {
+                              _passwordFocus.requestFocus();
+                            },
                             autofillHints: const [AutofillHints.email],
                             decoration: const InputDecoration(
                               labelText: 'Email',
@@ -225,15 +236,13 @@ class _AuthScreenState extends State<AuthScreen> {
                           const SizedBox(height: 12),
                           TextFormField(
                             controller: _passwordController,
+                            focusNode: _passwordFocus,
                             obscureText: _hidePassword,
-                            textInputAction: _registerMode
-                                ? TextInputAction.next
-                                : TextInputAction.done,
+                            textInputAction: TextInputAction.done,
                             autofillHints: _registerMode
                                 ? const [AutofillHints.newPassword]
                                 : const [AutofillHints.password],
-                            onFieldSubmitted:
-                                _registerMode ? null : (_) => _submitEmail(),
+                            onFieldSubmitted: (_) => _submitEmail(),
                             decoration: InputDecoration(
                               labelText: 'Password',
                               prefixIcon: const Icon(Icons.lock_outline),
@@ -258,25 +267,6 @@ class _AuthScreenState extends State<AuthScreen> {
                               return null;
                             },
                           ),
-                          if (_registerMode) ...[
-                            const SizedBox(height: 12),
-                            TextFormField(
-                              controller: _confirmController,
-                              obscureText: true,
-                              textInputAction: TextInputAction.done,
-                              onFieldSubmitted: (_) => _submitEmail(),
-                              decoration: const InputDecoration(
-                                labelText: 'Confirm password',
-                                prefixIcon: Icon(Icons.lock_reset_outlined),
-                              ),
-                              validator: (value) {
-                                if (value != _passwordController.text) {
-                                  return 'Passwords do not match';
-                                }
-                                return null;
-                              },
-                            ),
-                          ],
                           if (!_registerMode)
                             Align(
                               alignment: Alignment.centerRight,
