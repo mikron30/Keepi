@@ -4,6 +4,7 @@ import 'dart:typed_data';
 
 import 'package:firebase_ai/firebase_ai.dart';
 
+import '../domain/thing_detection.dart';
 import '../domain/thing_recognition.dart';
 
 class ThingAiService {
@@ -87,6 +88,123 @@ Rules:
       mimeType: mimeType,
       schema: _thingSchema,
       prompt: prompt,
+    );
+
+    return ThingRecognition.fromJson(decoded);
+  }
+
+  static Future<List<ThingDetection>> detectThings({
+    required Uint8List imageBytes,
+    required String mimeType,
+  }) async {
+    final detectionSchema = Schema.object(
+      properties: {
+        'objects': Schema.array(
+          items: Schema.object(
+            properties: {
+              'hint': Schema.string(),
+              'xMin': Schema.integer(),
+              'yMin': Schema.integer(),
+              'xMax': Schema.integer(),
+              'yMax': Schema.integer(),
+              'confidence': Schema.integer(),
+            },
+          ),
+        ),
+      },
+    );
+
+    const prompt = '''
+You are the object-localization stage of Keepi, a household inventory app.
+
+Look at the FULL image and locate each separate physical item that should become its own inventory entry.
+
+Return ONLY lightweight detections. Do not perform detailed product identification yet.
+
+Bounding-box format:
+- xMin, yMin, xMax, yMax are integers from 0 to 1000.
+- (0,0) is the top-left of the image.
+- (1000,1000) is the bottom-right.
+- Make each box as tight as practical around ONE item.
+- confidence is 0 to 100.
+- hint is a very short generic visual hint only, such as "book", "shoe pair", "hammer", "bottle", "drill", "tennis racket".
+
+Collection rules:
+- Bookshelf: create one detection for each visually separate book/spine.
+- Shoe rack: if two matching shoes clearly form one pair and are next to each other, use one box around the pair. Otherwise detect each shoe separately.
+- Tool rack/box: one box per separate tool.
+- Pantry/fridge: one box per separate package/container/product.
+- Sports equipment: one box per separate piece of equipment.
+- Clothing: one box per visually separate garment when practical.
+- Do NOT divide the image into arbitrary grid regions.
+- Do NOT return the shelf, cupboard, room, drawer, rack, table, or storage furniture unless it is itself clearly the intended object.
+- Do NOT merge several neighboring products into one box.
+- Skip background clutter or items that are too obscured to separate visually.
+- Avoid duplicate boxes for the same object.
+- Return at most 60 detections.
+''';
+
+    final decoded = await _generateJson(
+      imageBytes: imageBytes,
+      mimeType: mimeType,
+      schema: detectionSchema,
+      prompt: prompt,
+      timeout: const Duration(seconds: 60),
+    );
+
+    final rawObjects = decoded['objects'];
+    if (rawObjects is! List) {
+      throw StateError('AI returned an invalid detection result.');
+    }
+
+    return rawObjects
+        .whereType<Map>()
+        .map(
+          (item) => ThingDetection.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
+        .where((item) => item.hasValidBox && item.confidence >= 35)
+        .take(60)
+        .toList();
+  }
+
+  static Future<ThingRecognition> recognizeDetectedThing({
+    required Uint8List imageBytes,
+    required String hint,
+    required int itemIndex,
+    required int totalItems,
+  }) async {
+    final prompt = '''
+You are Keepi's detailed product recognizer.
+
+This image is a CROP created around one product detected in a larger collection photo.
+It is product $itemIndex of $totalItems.
+The localization pass gave the generic hint: "$hint".
+
+Identify the ONE main product centered in this crop and return structured inventory data.
+
+Rules:
+- Focus on the central detected object. Nearby fragments from neighboring objects are context only.
+- Never invent exact text, title, brand, or model that is not reasonably visible.
+- For a book, read the title/author from the visible spine or cover when possible. If the exact title cannot be read confidently, use a useful generic name such as "Book" rather than inventing a title.
+- For shoes, identify the pair/model/type if visible.
+- For tools, identify the specific tool type and brand/model only if visible.
+- categoryId must use the provided enum.
+- Use categoryId "books" for books.
+- condition is a visual estimate only.
+- Prices must be approximate integer Israeli shekels (ILS); use 0 when too uncertain.
+- confidence is 0 to 100 for identification confidence.
+- description should be one or two factual sentences.
+- searchKeywords should include useful English and Hebrew terms where possible.
+''';
+
+    final decoded = await _generateJson(
+      imageBytes: imageBytes,
+      mimeType: 'image/jpeg',
+      schema: _thingSchema,
+      prompt: prompt,
+      timeout: const Duration(seconds: 50),
     );
 
     return ThingRecognition.fromJson(decoded);
