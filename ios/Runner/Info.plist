@@ -30,6 +30,8 @@
 	<string>Keepi uses the camera to add Things to your inventory.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
 	<string>Keepi uses photos you choose to add Things to your inventory.</string>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Keepi uses your location when you choose to save home/current location or search for nearby Things.</string>
 	<key>UIApplicationSceneManifest</key>
 	<dict>
 		<key>UIApplicationSupportsMultipleScenes</key>
