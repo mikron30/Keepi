@@ -29,6 +29,7 @@ class Thing {
   const Thing({
     required this.id,
     required this.ownerId,
+    required this.ownerDisplayName,
     required this.name,
     required this.categoryId,
     required this.createdAt,
@@ -58,6 +59,7 @@ class Thing {
 
   final String id;
   final String ownerId;
+  final String ownerDisplayName;
   final String name;
   final String categoryId;
   final String? subcategoryId;
@@ -117,6 +119,7 @@ class Thing {
     return Thing(
       id: id,
       ownerId: (data['ownerId'] ?? '').toString(),
+      ownerDisplayName: (data['ownerDisplayName'] ?? 'Keepi user').toString(),
       name: (data['name'] ?? 'Unnamed Thing').toString(),
       categoryId: (data['categoryId'] ?? 'other').toString(),
       subcategoryId: data['subcategoryId']?.toString(),
@@ -162,6 +165,7 @@ class Thing {
     return {
       'id': id,
       'ownerId': ownerId,
+      'ownerDisplayName': ownerDisplayName,
       'name': name,
       'categoryId': categoryId,
       'subcategoryId': subcategoryId,
