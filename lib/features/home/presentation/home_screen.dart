@@ -29,6 +29,11 @@ class HomeScreen extends StatelessWidget {
         ),
         actions: [
           IconButton(
+            tooltip: 'Messages',
+            onPressed: () => context.push('/messages'),
+            icon: const Icon(Icons.chat_bubble_outline),
+          ),
+          IconButton(
             tooltip: 'Notifications',
             onPressed: () {},
             icon: const Icon(Icons.notifications_none),
