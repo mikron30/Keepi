@@ -26,6 +26,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
     'electronics',
     'food',
     'drinks',
+    'books',
     'clothing',
     'baby',
     'camping',
