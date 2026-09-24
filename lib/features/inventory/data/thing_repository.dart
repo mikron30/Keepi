@@ -223,7 +223,7 @@ class ThingRepository {
     }
 
     final user = _requireUser();
-    final selected = candidates.take(50).toList();
+    final selected = candidates.take(60).toList();
     final scanId = _firestore.collection('scan_ids').doc().id;
     final sourceExtension = _extensionForMimeType(sourceMimeType);
     final sourceRef = _storage.ref().child(
@@ -238,27 +238,22 @@ class ThingRepository {
 
     final sourceUrl = await _downloadUrl(sourceRef);
 
-    final tileCandidates = <int, ScannedThingCandidate>{};
+    final cropUrls = <int, String>{};
+    final cropPaths = <int, String>{};
+
     for (final candidate in selected) {
-      tileCandidates.putIfAbsent(candidate.tileIndex, () => candidate);
-    }
-
-    final tileUrls = <int, String>{};
-    final tilePaths = <int, String>{};
-
-    for (final entry in tileCandidates.entries) {
-      final tileRef = _storage.ref().child(
-            'users/${user.uid}/scans/$scanId/tile_${entry.key}.jpg',
+      final cropRef = _storage.ref().child(
+            'users/${user.uid}/scans/$scanId/crop_${candidate.itemIndex}.jpg',
           );
 
       await _uploadBytes(
-        storageRef: tileRef,
-        imageBytes: entry.value.tileBytes,
+        storageRef: cropRef,
+        imageBytes: candidate.cropBytes,
         mimeType: 'image/jpeg',
       );
 
-      tileUrls[entry.key] = await _downloadUrl(tileRef);
-      tilePaths[entry.key] = tileRef.fullPath;
+      cropUrls[candidate.itemIndex] = await _downloadUrl(cropRef);
+      cropPaths[candidate.itemIndex] = cropRef.fullPath;
     }
 
     final location = await _defaultThingLocation(user.uid);
@@ -267,8 +262,8 @@ class ThingRepository {
     for (final candidate in selected) {
       final recognition = candidate.recognition;
       final document = _firestore.collection('things').doc();
-      final tileUrl = tileUrls[candidate.tileIndex];
-      final tilePath = tilePaths[candidate.tileIndex];
+      final cropUrl = cropUrls[candidate.itemIndex];
+      final cropPath = cropPaths[candidate.itemIndex];
 
       batch.set(
         document,
@@ -288,11 +283,11 @@ class ThingRepository {
           estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
           enabledActions: const {ThingAction.personalUse},
           photoUrls: [
-            ?tileUrl,
+            ?cropUrl,
             sourceUrl,
           ],
           photoStoragePaths: [
-            ?tilePath,
+            ?cropPath,
             sourceRef.fullPath,
           ],
           location: location,
