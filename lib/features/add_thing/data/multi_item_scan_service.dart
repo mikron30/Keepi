@@ -344,6 +344,9 @@ class MultiItemScanService {
       }
 
       final hint = _normalizeHint(detection.hint);
+      if (_isContainerHint(hint)) {
+        return false;
+      }
       if (detection.normalizedArea > 0.62) {
         return false;
       }
@@ -402,7 +405,7 @@ class MultiItemScanService {
 
     final counts = <String, int>{};
     for (final detection in detections) {
-      final hint = _normalizeHint(detection.hint);
+      final hint = _canonicalHint(detection.hint);
       if (hint.isEmpty || hint == 'item' || hint == 'object') {
         continue;
       }
@@ -442,6 +445,32 @@ class MultiItemScanService {
         hint.contains('bottle') ||
         hint.contains('can') ||
         hint.contains('tool');
+  }
+
+  bool _isContainerHint(String hint) {
+    return hint.contains('bookshelf') ||
+        hint == 'shelf' ||
+        hint.contains('rack') ||
+        hint.contains('cupboard') ||
+        hint.contains('cabinet') ||
+        hint == 'room' ||
+        hint.contains('drawer');
+  }
+
+  String _canonicalHint(String value) {
+    final hint = _normalizeHint(value);
+    if (hint.contains('book')) return 'book';
+    if (hint.contains('shoe') || hint.contains('sneaker')) return 'shoe';
+    if (hint.contains('bottle')) return 'bottle';
+    if (hint.contains('tool') ||
+        hint.contains('hammer') ||
+        hint.contains('drill') ||
+        hint.contains('screwdriver') ||
+        hint.contains('wrench')) {
+      return 'tool';
+    }
+    if (hint.contains('can')) return 'can';
+    return hint;
   }
 
   String _normalizeHint(String value) {
