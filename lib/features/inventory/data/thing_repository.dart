@@ -205,14 +205,8 @@ class ThingRepository {
       }
     }
 
-    onProgress?.call(
-      totalUploads,
-      totalUploads,
-      'Saving inventory records...',
-    );
-
     await batch.commit().timeout(
-      const Duration(seconds: 60),
+      const Duration(seconds: 30),
       onTimeout: () {
         throw TimeoutException(
           'Batch save timed out. Check Firestore setup and rules.',
@@ -363,8 +357,14 @@ class ThingRepository {
       }
     }
 
+    onProgress?.call(
+      totalUploads,
+      totalUploads,
+      'Saving inventory records...',
+    );
+
     await batch.commit().timeout(
-      const Duration(seconds: 30),
+      const Duration(seconds: 60),
       onTimeout: () {
         throw TimeoutException(
           'Batch save timed out. Check Firestore setup and rules.',
