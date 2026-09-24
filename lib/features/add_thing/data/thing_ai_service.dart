@@ -152,6 +152,71 @@ General rules:
         .toList();
   }
 
+  static Future<List<ThingRecognition>> recognizeMultipleTile({
+    required Uint8List imageBytes,
+    required int tileIndex,
+    required int totalTiles,
+  }) async {
+    final schema = Schema.object(
+      properties: {
+        'things': Schema.array(items: _thingSchema),
+      },
+    );
+
+    final prompt = '''
+You are Keepi's focused multi-item scanner.
+
+This image is scan area $tileIndex of $totalTiles from a larger photo that contains a collection of similar household items.
+
+Identify every distinct useful physical item visible in THIS CROP only.
+
+Examples:
+- bookshelf: each readable book is a separate item
+- shoe rack: each distinct pair/model of shoes is a separate item
+- tool rack: each separate tool is a separate item
+- pantry/fridge: each distinct product/container is a separate item
+- sports shelf: each separate piece of equipment is a separate item
+
+Rules:
+- Return no more than 15 items from this crop.
+- Do not return the shelf, cupboard, room, rack, or storage furniture unless it is clearly the intended item.
+- Never invent a title, brand, model, or label that is not reasonably readable/visible.
+- For books, read spine/cover titles. Skip books whose title cannot be read with reasonable confidence.
+- If part of an item is cut off at an edge, include it only if it is still identifiable.
+- categoryId must use the provided enum.
+- Use categoryId "books" for books.
+- condition is a visual estimate only.
+- Prices are approximate integer Israeli shekels (ILS); use 0 when uncertain.
+- confidence is 0 to 100 for identification confidence.
+- description should be concise and factual.
+- searchKeywords should include useful English and Hebrew terms where possible.
+''';
+
+    final decoded = await _generateJson(
+      imageBytes: imageBytes,
+      mimeType: 'image/jpeg',
+      schema: schema,
+      prompt: prompt,
+      timeout: const Duration(seconds: 60),
+    );
+
+    final rawThings = decoded['things'];
+    if (rawThings is! List) {
+      throw StateError('AI returned an invalid tile result.');
+    }
+
+    return rawThings
+        .whereType<Map>()
+        .map(
+          (item) => ThingRecognition.fromJson(
+            Map<String, dynamic>.from(item),
+          ),
+        )
+        .where((item) => item.name.trim().isNotEmpty)
+        .take(15)
+        .toList();
+  }
+
   static Future<Map<String, dynamic>> _generateJson({
     required Uint8List imageBytes,
     required String mimeType,
