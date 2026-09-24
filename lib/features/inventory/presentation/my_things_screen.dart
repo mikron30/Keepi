@@ -173,10 +173,24 @@ class _ThingCard extends StatelessWidget {
                     spacing: 8,
                     runSpacing: 6,
                     children: [
-                      const _SmallChip(
-                        icon: Icons.visibility_off_outlined,
-                        label: 'Private',
-                      ),
+                      if (thing.enabledActions.isEmpty ||
+                          thing.enabledActions
+                              .contains(ThingAction.personalUse))
+                        _SmallChip(
+                          icon: thing.visibility == ThingVisibility.private
+                              ? Icons.visibility_off_outlined
+                              : Icons.home_outlined,
+                          label: thing.visibility == ThingVisibility.private
+                              ? 'Personal'
+                              : 'Personal use',
+                        ),
+                      for (final action in thing.enabledActions.where(
+                        (action) => action != ThingAction.personalUse,
+                      ))
+                        _SmallChip(
+                          icon: _actionIcon(action),
+                          label: _actionLabel(action),
+                        ),
                       if (value != null)
                         _SmallChip(
                           icon: Icons.sell_outlined,
@@ -196,6 +210,40 @@ class _ThingCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  static String _actionLabel(ThingAction action) {
+    switch (action) {
+      case ThingAction.personalUse:
+        return 'Personal use';
+      case ThingAction.sell:
+        return 'For sale';
+      case ThingAction.rent:
+        return 'For rent';
+      case ThingAction.borrow:
+        return 'For loan';
+      case ThingAction.give:
+        return 'Free';
+      case ThingAction.exchange:
+        return 'Exchange';
+    }
+  }
+
+  static IconData _actionIcon(ThingAction action) {
+    switch (action) {
+      case ThingAction.personalUse:
+        return Icons.home_outlined;
+      case ThingAction.sell:
+        return Icons.sell_outlined;
+      case ThingAction.rent:
+        return Icons.payments_outlined;
+      case ThingAction.borrow:
+        return Icons.handshake_outlined;
+      case ThingAction.give:
+        return Icons.volunteer_activism_outlined;
+      case ThingAction.exchange:
+        return Icons.swap_horiz;
+    }
   }
 
   static String _pretty(String value) {
