@@ -32,6 +32,10 @@ service cloud.firestore {
     match /users/{userId} {
       allow read, create, update: if isUser(userId);
       allow delete: if false;
+
+      match /thingLocations/{thingId} {
+        allow read, create, update, delete: if isUser(userId);
+      }
     }
 
     match /things/{thingId} {
