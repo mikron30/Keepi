@@ -99,12 +99,12 @@ class _ExploreScreenState extends State<ExploreScreen> {
       );
 
       if (mounted) {
-        context.push('/messages/${conversationId}');
+        context.push('/messages/$conversationId');
       }
     } catch (error) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not start chat: ${error}')),
+          SnackBar(content: Text('Could not start chat: $error')),
         );
       }
     } finally {
