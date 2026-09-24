@@ -160,6 +160,7 @@ class MultiItemScanService {
         mimeType: 'image/jpeg',
         pass: 2,
         dominantHint: dominantHint,
+        existingDetections: detections,
       );
 
       detections = _mergeDetectionPasses(detections, secondPass);
@@ -183,6 +184,7 @@ class MultiItemScanService {
           mimeType: 'image/jpeg',
           pass: 3,
           dominantHint: dominantHint,
+          existingDetections: detections,
         );
 
         detections = _mergeDetectionPasses(detections, thirdPass);
@@ -243,13 +245,13 @@ class MultiItemScanService {
             recognitionDurations,
             totalDetected - i,
           ),
-          currentCropBytes: crop.bytes,
+          currentCropBytes: crop.thumbnailBytes,
           currentHint: crop.detection.hint,
         );
 
         try {
           final recognition = await ThingAiService.recognizeDetectedThing(
-            imageBytes: crop.bytes,
+            imageBytes: crop.recognitionBytes,
             hint: crop.detection.hint,
             itemIndex: itemNumber,
             totalItems: totalDetected,
@@ -258,7 +260,7 @@ class MultiItemScanService {
           candidates.add(
             ScannedThingCandidate(
               recognition: recognition,
-              cropBytes: crop.bytes,
+              cropBytes: crop.thumbnailBytes,
               itemIndex: itemNumber,
               totalItems: totalDetected,
             ),
@@ -288,7 +290,7 @@ class MultiItemScanService {
             recognitionDurations,
             totalDetected - itemNumber,
           ),
-          currentCropBytes: crop.bytes,
+          currentCropBytes: crop.thumbnailBytes,
           currentHint: crop.detection.hint,
         );
       }
@@ -385,7 +387,7 @@ class MultiItemScanService {
 
     for (final detection in detections) {
       final duplicateIndex = result.indexWhere(
-        (existing) => _intersectionOverUnion(existing, detection) >= 0.68,
+        (existing) => _samePhysicalDetection(existing, detection),
       );
 
       if (duplicateIndex == -1) {
@@ -396,6 +398,48 @@ class MultiItemScanService {
     }
 
     return result;
+  }
+
+  bool _samePhysicalDetection(
+    ThingDetection a,
+    ThingDetection b,
+  ) {
+    final iou = _intersectionOverUnion(a, b);
+    if (iou >= 0.52) {
+      return true;
+    }
+
+    final overlapOnSmaller = _intersectionOverSmallerArea(a, b);
+    if (overlapOnSmaller >= 0.76) {
+      return true;
+    }
+
+    return false;
+  }
+
+  double _intersectionOverSmallerArea(
+    ThingDetection a,
+    ThingDetection b,
+  ) {
+    final left = math.max(a.xMin, b.xMin);
+    final top = math.max(a.yMin, b.yMin);
+    final right = math.min(a.xMax, b.xMax);
+    final bottom = math.min(a.yMax, b.yMax);
+
+    if (right <= left || bottom <= top) {
+      return 0;
+    }
+
+    final intersection = (right - left) * (bottom - top);
+    final areaA = (a.xMax - a.xMin) * (a.yMax - a.yMin);
+    final areaB = (b.xMax - b.xMin) * (b.yMax - b.yMin);
+    final smaller = math.min(areaA, areaB);
+
+    if (smaller <= 0) {
+      return 0;
+    }
+
+    return intersection / smaller;
   }
 
   String? _dominantHint(List<ThingDetection> detections) {
@@ -498,26 +542,63 @@ class MultiItemScanService {
     final rawWidth = math.max(1, rawRight - rawLeft);
     final rawHeight = math.max(1, rawBottom - rawTop);
 
-    final padX = math.max(2, (rawWidth * cropPaddingRatio).round());
-    final padY = math.max(2, (rawHeight * cropPaddingRatio).round());
+    img.Image makeCrop({
+      required double paddingXRatio,
+      required double paddingYRatio,
+    }) {
+      final padX = math.max(2, (rawWidth * paddingXRatio).round());
+      final padY = math.max(2, (rawHeight * paddingYRatio).round());
 
-    final left = math.max(0, rawLeft - padX);
-    final top = math.max(0, rawTop - padY);
-    final right = math.min(source.width, rawRight + padX);
-    final bottom = math.min(source.height, rawBottom + padY);
+      final left = math.max(0, rawLeft - padX);
+      final top = math.max(0, rawTop - padY);
+      final right = math.min(source.width, rawRight + padX);
+      final bottom = math.min(source.height, rawBottom + padY);
 
-    final cropped = img.copyCrop(
-      source,
-      x: left,
-      y: top,
-      width: math.max(1, right - left),
-      height: math.max(1, bottom - top),
+      return img.copyCrop(
+        source,
+        x: left,
+        y: top,
+        width: math.max(1, right - left),
+        height: math.max(1, bottom - top),
+      );
+    }
+
+    // Thumbnail stays very tight so My Things shows the actual product only.
+    final thumbnail = makeCrop(
+      paddingXRatio: cropPaddingRatio,
+      paddingYRatio: cropPaddingRatio,
     );
+
+    // Recognition gets more surrounding context. This is especially useful
+    // for narrow book spines, labels, shoes, and tightly packed tools.
+    var recognitionCrop = makeCrop(
+      paddingXRatio: 0.22,
+      paddingYRatio: 0.08,
+    );
+
+    final longestSide = math.max(
+      recognitionCrop.width,
+      recognitionCrop.height,
+    );
+
+    // Upscale small/narrow crops before sending them to Gemini so text on
+    // book spines and labels has enough pixels for visual recognition.
+    if (longestSide < 900) {
+      final scale = 900 / longestSide;
+      recognitionCrop = img.copyResize(
+        recognitionCrop,
+        width: math.max(1, (recognitionCrop.width * scale).round()),
+        height: math.max(1, (recognitionCrop.height * scale).round()),
+      );
+    }
 
     return _DetectedCrop(
       detection: detection,
-      bytes: Uint8List.fromList(
-        img.encodeJpg(cropped, quality: jpegQuality),
+      thumbnailBytes: Uint8List.fromList(
+        img.encodeJpg(thumbnail, quality: jpegQuality),
+      ),
+      recognitionBytes: Uint8List.fromList(
+        img.encodeJpg(recognitionCrop, quality: jpegQuality),
       ),
     );
   }
@@ -586,9 +667,11 @@ class MultiItemScanService {
 class _DetectedCrop {
   const _DetectedCrop({
     required this.detection,
-    required this.bytes,
+    required this.thumbnailBytes,
+    required this.recognitionBytes,
   });
 
   final ThingDetection detection;
-  final Uint8List bytes;
+  final Uint8List thumbnailBytes;
+  final Uint8List recognitionBytes;
 }
