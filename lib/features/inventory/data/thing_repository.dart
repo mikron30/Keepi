@@ -116,6 +116,16 @@ class ThingRepository {
           },
         );
 
+    if (location != null) {
+      await _savePrivateThingLocation(
+        ownerId: user.uid,
+        thingId: document.id,
+        latitude: location['latitude']!,
+        longitude: location['longitude']!,
+        label: 'Home',
+      );
+    }
+
     return document.id;
   }
 
@@ -171,6 +181,23 @@ class ThingRepository {
           scanId: scanId,
         ),
       );
+
+      if (location != null) {
+        batch.set(
+          _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('thingLocations')
+              .doc(document.id),
+          {
+            'thingId': document.id,
+            'latitude': location['latitude'],
+            'longitude': location['longitude'],
+            'label': 'Home',
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
     }
 
     await batch.commit().timeout(
@@ -207,10 +234,20 @@ class ThingRepository {
       'loanedAt': FieldValue.serverTimestamp(),
       'dueAt': dueAt == null ? null : Timestamp.fromDate(dueAt),
       'locationLabel': 'With ${borrowerName.trim()}',
-      if (latitude != null) 'latitude': latitude,
-      if (longitude != null) 'longitude': longitude,
+      if (latitude != null) 'latitude': _coarseCoordinate(latitude),
+      if (longitude != null) 'longitude': _coarseCoordinate(longitude),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    if (latitude != null && longitude != null) {
+      await _savePrivateThingLocation(
+        ownerId: user.uid,
+        thingId: thingId,
+        latitude: latitude,
+        longitude: longitude,
+        label: 'With ${borrowerName.trim()}',
+      );
+    }
   }
 
   Future<void> markThingReturned(String thingId) async {
@@ -229,10 +266,22 @@ class ThingRepository {
       'loanedAt': null,
       'dueAt': null,
       'locationLabel': location == null ? 'With me' : 'Home',
-      if (location != null) 'latitude': location['latitude'],
-      if (location != null) 'longitude': location['longitude'],
+      if (location != null)
+        'latitude': _coarseCoordinate(location['latitude']!),
+      if (location != null)
+        'longitude': _coarseCoordinate(location['longitude']!),
       'updatedAt': FieldValue.serverTimestamp(),
     });
+
+    if (location != null) {
+      await _savePrivateThingLocation(
+        ownerId: user.uid,
+        thingId: thingId,
+        latitude: location['latitude']!,
+        longitude: location['longitude']!,
+        label: 'Home',
+      );
+    }
   }
 
   Future<Map<String, double>?> _defaultThingLocation(String uid) async {
@@ -321,8 +370,12 @@ class ThingRepository {
       'estimatedCurrentValue': estimatedCurrentValueIls > 0
           ? estimatedCurrentValueIls.toDouble()
           : null,
-      'latitude': location?['latitude'],
-      'longitude': location?['longitude'],
+      'latitude': location == null
+          ? null
+          : _coarseCoordinate(location['latitude']!),
+      'longitude': location == null
+          ? null
+          : _coarseCoordinate(location['longitude']!),
       'locationLabel': location == null ? null : 'Home',
       'currentHolderUserId': null,
       'currentHolderName': null,
@@ -335,6 +388,31 @@ class ThingRepository {
         'model': 'agent-platform-gemini',
       },
     };
+  }
+
+  Future<void> _savePrivateThingLocation({
+    required String ownerId,
+    required String thingId,
+    required double latitude,
+    required double longitude,
+    required String label,
+  }) {
+    return _firestore
+        .collection('users')
+        .doc(ownerId)
+        .collection('thingLocations')
+        .doc(thingId)
+        .set({
+      'thingId': thingId,
+      'latitude': latitude,
+      'longitude': longitude,
+      'label': label,
+      'updatedAt': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  double _coarseCoordinate(double value) {
+    return (value * 100).round() / 100;
   }
 
   String _displayNameFor(User user) {
