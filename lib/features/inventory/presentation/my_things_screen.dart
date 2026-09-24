@@ -20,6 +20,81 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
     _repository = ThingRepository();
   }
 
+  Future<void> _markLent(Thing thing) async {
+    final controller = TextEditingController();
+
+    final borrowerName = await showDialog<String>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('Who has ${thing.name}?'),
+          content: TextField(
+            controller: controller,
+            autofocus: true,
+            decoration: const InputDecoration(
+              labelText: 'Borrower / holder name',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () {
+                final name = controller.text.trim();
+                if (name.isNotEmpty) Navigator.pop(context, name);
+              },
+              child: const Text('Mark as lent'),
+            ),
+          ],
+        );
+      },
+    );
+
+    controller.dispose();
+
+    if (borrowerName == null || borrowerName.isEmpty) return;
+
+    try {
+      await _repository.markThingLent(
+        thingId: thing.id,
+        borrowerName: borrowerName,
+      );
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${thing.name} is now with $borrowerName.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not update loan: $error')),
+        );
+      }
+    }
+  }
+
+  Future<void> _markReturned(Thing thing) async {
+    try {
+      await _repository.markThingReturned(thing.id);
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('${thing.name} marked as returned.')),
+        );
+      }
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Could not mark returned: $error')),
+        );
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -62,7 +137,11 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
               itemCount: things.length,
               separatorBuilder: (_, _) => const SizedBox(height: 10),
               itemBuilder: (context, index) {
-                return _ThingCard(thing: things[index]);
+                return _ThingCard(
+                  thing: things[index],
+                  onMarkLent: () => _markLent(things[index]),
+                  onMarkReturned: () => _markReturned(things[index]),
+                );
               },
             ),
           );
@@ -78,9 +157,15 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
 }
 
 class _ThingCard extends StatelessWidget {
-  const _ThingCard({required this.thing});
+  const _ThingCard({
+    required this.thing,
+    required this.onMarkLent,
+    required this.onMarkReturned,
+  });
 
   final Thing thing;
+  final VoidCallback onMarkLent;
+  final VoidCallback onMarkReturned;
 
   @override
   Widget build(BuildContext context) {
@@ -201,10 +286,42 @@ class _ThingCard extends StatelessWidget {
                           icon: Icons.auto_awesome,
                           label: 'AI $confidence%',
                         ),
+                      if (thing.currentHolderName?.isNotEmpty == true)
+                        _SmallChip(
+                          icon: Icons.person_pin_circle_outlined,
+                          label: 'With ${thing.currentHolderName}',
+                        ),
                     ],
                   ),
                 ],
               ),
+            ),
+            PopupMenuButton<String>(
+              tooltip: 'Thing options',
+              onSelected: (value) {
+                if (value == 'lend') onMarkLent();
+                if (value == 'returned') onMarkReturned();
+              },
+              itemBuilder: (context) => [
+                if (thing.currentHolderName?.isNotEmpty != true)
+                  const PopupMenuItem(
+                    value: 'lend',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.person_add_alt_1_outlined),
+                      title: Text('Mark as lent'),
+                    ),
+                  ),
+                if (thing.currentHolderName?.isNotEmpty == true)
+                  const PopupMenuItem(
+                    value: 'returned',
+                    child: ListTile(
+                      dense: true,
+                      leading: Icon(Icons.assignment_return_outlined),
+                      title: Text('Mark as returned'),
+                    ),
+                  ),
+              ],
             ),
           ],
         ),
