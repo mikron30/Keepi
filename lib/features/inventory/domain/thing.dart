@@ -50,6 +50,10 @@ class Thing {
     this.longitude,
     this.geohash,
     this.locationLabel,
+    this.currentHolderUserId,
+    this.currentHolderName,
+    this.loanedAt,
+    this.dueAt,
   });
 
   final String id;
@@ -73,6 +77,10 @@ class Thing {
   final double? longitude;
   final String? geohash;
   final String? locationLabel;
+  final String? currentHolderUserId;
+  final String? currentHolderName;
+  final DateTime? loanedAt;
+  final DateTime? dueAt;
   final DateTime createdAt;
   final DateTime updatedAt;
 
@@ -140,6 +148,11 @@ class Thing {
       longitude: (data['longitude'] as num?)?.toDouble(),
       geohash: data['geohash']?.toString(),
       locationLabel: data['locationLabel']?.toString(),
+      currentHolderUserId: data['currentHolderUserId']?.toString(),
+      currentHolderName: data['currentHolderName']?.toString(),
+      loanedAt:
+          data['loanedAt'] == null ? null : parseDate(data['loanedAt']),
+      dueAt: data['dueAt'] == null ? null : parseDate(data['dueAt']),
       createdAt: parseDate(data['createdAt']),
       updatedAt: parseDate(data['updatedAt']),
     );
@@ -168,6 +181,10 @@ class Thing {
       'longitude': longitude,
       'geohash': geohash,
       'locationLabel': locationLabel,
+      'currentHolderUserId': currentHolderUserId,
+      'currentHolderName': currentHolderName,
+      'loanedAt': loanedAt?.toIso8601String(),
+      'dueAt': dueAt?.toIso8601String(),
       'createdAt': createdAt.toIso8601String(),
       'updatedAt': updatedAt.toIso8601String(),
     };
