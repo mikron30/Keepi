@@ -134,6 +134,7 @@ General rules:
       mimeType: mimeType,
       schema: schema,
       prompt: prompt,
+      timeout: const Duration(seconds: 90),
     );
 
     final rawThings = decoded['things'];
@@ -156,6 +157,7 @@ General rules:
     required String mimeType,
     required Schema schema,
     required String prompt,
+    Duration timeout = const Duration(seconds: 45),
   }) async {
     Object? lastError;
 
@@ -175,7 +177,7 @@ General rules:
               TextPart(prompt),
               InlineDataPart(mimeType, imageBytes),
             ]),
-          ]).timeout(const Duration(seconds: 45));
+          ]).timeout(timeout);
 
           final text = response.text;
           if (text == null || text.trim().isEmpty) {
@@ -218,6 +220,10 @@ General rules:
         message.contains('503') ||
         message.contains('unavailable') ||
         message.contains('deadline') ||
-        message.contains('timeout');
+        message.contains('timeout') ||
+        message.contains('failed to fetch') ||
+        message.contains('clientexception') ||
+        message.contains('network error') ||
+        message.contains('connection reset');
   }
 }
