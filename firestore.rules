@@ -47,7 +47,9 @@ service cloud.firestore {
 
     match /conversations/{conversationId} {
       allow create: if isNewConversationParticipant();
-      allow read, update: if isConversationParticipant();
+      allow read: if isConversationParticipant();
+      allow update: if isConversationParticipant()
+        && request.resource.data.participantIds == resource.data.participantIds;
       allow delete: if false;
 
       match /messages/{messageId} {
