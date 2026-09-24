@@ -223,8 +223,9 @@ class ThingRepository {
     final user = _requireUser();
     final reference = _firestore.collection('things').doc(thingId);
     final snapshot = await reference.get();
+    final data = snapshot.data();
 
-    if (!snapshot.exists || snapshot.data()?['ownerId'] != user.uid) {
+    if (!snapshot.exists || data?['ownerId'] != user.uid) {
       throw StateError('Only the owner can mark this Thing as lent.');
     }
 
@@ -234,6 +235,8 @@ class ThingRepository {
       'loanedAt': FieldValue.serverTimestamp(),
       'dueAt': dueAt == null ? null : Timestamp.fromDate(dueAt),
       'locationLabel': 'With ${borrowerName.trim()}',
+      'visibilityBeforeLoan': data?['visibility'] ?? 'private',
+      'visibility': 'private',
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
@@ -262,8 +265,9 @@ class ThingRepository {
     final location = await _defaultThingLocation(user.uid);
     final reference = _firestore.collection('things').doc(thingId);
     final snapshot = await reference.get();
+    final data = snapshot.data();
 
-    if (!snapshot.exists || snapshot.data()?['ownerId'] != user.uid) {
+    if (!snapshot.exists || data?['ownerId'] != user.uid) {
       throw StateError('Only the owner can mark this Thing as returned.');
     }
 
@@ -273,6 +277,8 @@ class ThingRepository {
       'loanedAt': null,
       'dueAt': null,
       'locationLabel': location == null ? 'With me' : 'Home',
+      'visibility': data?['visibilityBeforeLoan'] ?? 'private',
+      'visibilityBeforeLoan': FieldValue.delete(),
       'updatedAt': FieldValue.serverTimestamp(),
     };
 
