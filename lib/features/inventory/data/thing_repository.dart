@@ -228,16 +228,23 @@ class ThingRepository {
       throw StateError('Only the owner can mark this Thing as lent.');
     }
 
-    await reference.update({
+    final updates = <String, dynamic>{
       'currentHolderUserId': borrowerUserId,
       'currentHolderName': borrowerName.trim(),
       'loanedAt': FieldValue.serverTimestamp(),
       'dueAt': dueAt == null ? null : Timestamp.fromDate(dueAt),
       'locationLabel': 'With ${borrowerName.trim()}',
-      if (latitude != null) 'latitude': _coarseCoordinate(latitude),
-      if (longitude != null) 'longitude': _coarseCoordinate(longitude),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    if (latitude != null) {
+      updates['latitude'] = _coarseCoordinate(latitude);
+    }
+    if (longitude != null) {
+      updates['longitude'] = _coarseCoordinate(longitude);
+    }
+
+    await reference.update(updates);
 
     if (latitude != null && longitude != null) {
       await _savePrivateThingLocation(
@@ -260,18 +267,21 @@ class ThingRepository {
       throw StateError('Only the owner can mark this Thing as returned.');
     }
 
-    await reference.update({
+    final updates = <String, dynamic>{
       'currentHolderUserId': null,
       'currentHolderName': null,
       'loanedAt': null,
       'dueAt': null,
       'locationLabel': location == null ? 'With me' : 'Home',
-      if (location != null)
-        'latitude': _coarseCoordinate(location['latitude']!),
-      if (location != null)
-        'longitude': _coarseCoordinate(location['longitude']!),
       'updatedAt': FieldValue.serverTimestamp(),
-    });
+    };
+
+    if (location != null) {
+      updates['latitude'] = _coarseCoordinate(location['latitude']!);
+      updates['longitude'] = _coarseCoordinate(location['longitude']!);
+    }
+
+    await reference.update(updates);
 
     if (location != null) {
       await _savePrivateThingLocation(
@@ -332,6 +342,16 @@ class ThingRepository {
     String? scanId,
   }) {
     final now = FieldValue.serverTimestamp();
+    final attributes = <String, dynamic>{
+      'brand': brand.trim(),
+      'model': model.trim(),
+      'aiConfidence': recognition.confidence,
+      'recognizedBy': 'agent-platform-gemini',
+    };
+
+    if (scanId != null) {
+      attributes['scanId'] = scanId;
+    }
 
     return {
       'id': id,
@@ -343,13 +363,7 @@ class ThingRepository {
       'description': description.trim(),
       'photoUrls': photoUrls,
       'photoStoragePaths': photoStoragePaths,
-      'attributes': {
-        'brand': brand.trim(),
-        'model': model.trim(),
-        'aiConfidence': recognition.confidence,
-        'recognizedBy': 'agent-platform-gemini',
-        if (scanId != null) 'scanId': scanId,
-      },
+      'attributes': attributes,
       'searchKeywords': {
         ...recognition.searchKeywords.map((value) => value.toLowerCase()),
         name.trim().toLowerCase(),
