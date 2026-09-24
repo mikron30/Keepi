@@ -399,11 +399,11 @@ class _AddThingScreenState extends State<AddThingScreen> {
               onTap: _busy ? null : () => _pickImage(ImageSource.gallery),
             ),
             const SizedBox(height: 12),
-            const _ActionCard(
+            _ActionCard(
               icon: Icons.view_in_ar_outlined,
-              title: 'Scan a room',
-              subtitle: 'Coming soon — detect multiple Things at once',
-              onTap: null,
+              title: 'Scan multiple Things',
+              subtitle: 'Bookshelf, room, tools, cupboard and more',
+              onTap: _busy ? null : () => context.push('/scan'),
             ),
             if (_imageBytes != null && !_busy) ...[
               const SizedBox(height: 22),
