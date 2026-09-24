@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 
+import '../../add_thing/domain/scanned_thing_candidate.dart';
 import '../../add_thing/domain/thing_recognition.dart';
 import '../domain/thing.dart';
 
@@ -210,6 +211,123 @@ class ThingRepository {
     );
 
     return recognitions.take(50).length;
+  }
+
+  Future<int> createThingsFromMultiScan({
+    required Uint8List sourceImageBytes,
+    required String sourceMimeType,
+    required List<ScannedThingCandidate> candidates,
+  }) async {
+    if (candidates.isEmpty) {
+      return 0;
+    }
+
+    final user = _requireUser();
+    final selected = candidates.take(50).toList();
+    final scanId = _firestore.collection('scan_ids').doc().id;
+    final sourceExtension = _extensionForMimeType(sourceMimeType);
+    final sourceRef = _storage.ref().child(
+          'users/${user.uid}/scans/$scanId/source.$sourceExtension',
+        );
+
+    await _uploadBytes(
+      storageRef: sourceRef,
+      imageBytes: sourceImageBytes,
+      mimeType: sourceMimeType,
+    );
+
+    final sourceUrl = await _downloadUrl(sourceRef);
+
+    final tileCandidates = <int, ScannedThingCandidate>{};
+    for (final candidate in selected) {
+      tileCandidates.putIfAbsent(candidate.tileIndex, () => candidate);
+    }
+
+    final tileUrls = <int, String>{};
+    final tilePaths = <int, String>{};
+
+    for (final entry in tileCandidates.entries) {
+      final tileRef = _storage.ref().child(
+            'users/${user.uid}/scans/$scanId/tile_${entry.key}.jpg',
+          );
+
+      await _uploadBytes(
+        storageRef: tileRef,
+        imageBytes: entry.value.tileBytes,
+        mimeType: 'image/jpeg',
+      );
+
+      tileUrls[entry.key] = await _downloadUrl(tileRef);
+      tilePaths[entry.key] = tileRef.fullPath;
+    }
+
+    final location = await _defaultThingLocation(user.uid);
+    final batch = _firestore.batch();
+
+    for (final candidate in selected) {
+      final recognition = candidate.recognition;
+      final document = _firestore.collection('things').doc();
+      final tileUrl = tileUrls[candidate.tileIndex];
+      final tilePath = tilePaths[candidate.tileIndex];
+
+      batch.set(
+        document,
+        _thingMap(
+          id: document.id,
+          ownerId: user.uid,
+          ownerDisplayName: _displayNameFor(user),
+          recognition: recognition,
+          name: recognition.name,
+          categoryId: recognition.categoryId,
+          subcategory: recognition.subcategory,
+          brand: recognition.brand,
+          model: recognition.model,
+          condition: recognition.condition,
+          description: recognition.description,
+          estimatedNewPriceIls: recognition.estimatedNewPriceIls,
+          estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
+          enabledActions: const {ThingAction.personalUse},
+          photoUrls: [
+            if (tileUrl != null) tileUrl,
+            sourceUrl,
+          ],
+          photoStoragePaths: [
+            if (tilePath != null) tilePath,
+            sourceRef.fullPath,
+          ],
+          location: location,
+          scanId: scanId,
+        ),
+      );
+
+      if (location != null) {
+        batch.set(
+          _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('thingLocations')
+              .doc(document.id),
+          {
+            'thingId': document.id,
+            'latitude': location['latitude'],
+            'longitude': location['longitude'],
+            'label': 'Home',
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
+    }
+
+    await batch.commit().timeout(
+      const Duration(seconds: 30),
+      onTimeout: () {
+        throw TimeoutException(
+          'Batch save timed out. Check Firestore setup and rules.',
+        );
+      },
+    );
+
+    return selected.length;
   }
 
   Future<void> markThingLent({
