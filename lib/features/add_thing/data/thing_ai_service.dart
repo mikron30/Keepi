@@ -96,6 +96,8 @@ Rules:
   static Future<List<ThingDetection>> detectThings({
     required Uint8List imageBytes,
     required String mimeType,
+    int pass = 1,
+    String? dominantHint,
   }) async {
     final detectionSchema = Schema.object(
       properties: {
@@ -103,10 +105,7 @@ Rules:
           items: Schema.object(
             properties: {
               'hint': Schema.string(),
-              'xMin': Schema.integer(),
-              'yMin': Schema.integer(),
-              'xMax': Schema.integer(),
-              'yMax': Schema.integer(),
+              'box2d': Schema.array(items: Schema.integer()),
               'confidence': Schema.integer(),
             },
           ),
@@ -114,34 +113,61 @@ Rules:
       },
     );
 
-    const prompt = '''
+    final passInstruction = switch (pass) {
+      1 =>
+        'First localization pass: find every clearly separable inventory item.',
+      2 =>
+        'Second exhaustive pass: deliberately look for narrow, tightly packed, '
+            'partially occluded, or easy-to-miss items that a first pass may skip.',
+      _ =>
+        'Final recovery pass: search specifically for remaining missed objects, '
+            'especially between already-obvious neighboring objects.',
+    };
+
+    final collectionInstruction = dominantHint == null ||
+            dominantHint.trim().isEmpty
+        ? ''
+        : '''
+The first pass suggests this is mainly a collection of "$dominantHint" items.
+Be especially exhaustive for that object type. Return ONE box per physical
+item, even when many similar items are tightly packed next to each other.
+''';
+
+    final prompt = '''
 You are the object-localization stage of Keepi, a household inventory app.
 
-Look at the FULL image and locate each separate physical item that should become its own inventory entry.
+Look at the FULL image and locate each separate physical item that should become
+its own inventory entry. Do not divide the image into a grid.
 
-Return ONLY lightweight detections. Do not perform detailed product identification yet.
+$passInstruction
+$collectionInstruction
+
+Return ONLY lightweight detections. Detailed product identification happens in
+a later call on each crop.
 
 Bounding-box format:
-- xMin, yMin, xMax, yMax are integers from 0 to 1000.
-- (0,0) is the top-left of the image.
-- (1000,1000) is the bottom-right.
-- Make each box as tight as practical around ONE item.
+- Return box2d as [yMin, xMin, yMax, xMax].
+- Every coordinate is an integer from 0 to 1000.
+- (0,0) is the top-left; (1000,1000) is the bottom-right.
+- Make each box tight around ONE physical item.
 - confidence is 0 to 100.
-- hint is a very short generic visual hint only, such as "book", "shoe pair", "hammer", "bottle", "drill", "tennis racket".
+- hint is a short generic type, e.g. "book", "shoe pair", "hammer", "bottle".
 
 Collection rules:
-- Bookshelf: create one detection for each visually separate book/spine.
-- Shoe rack: if two matching shoes clearly form one pair and are next to each other, use one box around the pair. Otherwise detect each shoe separately.
+- Bookshelf: ONE box for EACH visible book/spine, including thin books.
+  Count neighboring spines separately even when touching. Do not require the
+  title to be readable during localization.
+- Shoe rack: one box per clear pair when the matching pair is together;
+  otherwise one box per shoe.
 - Tool rack/box: one box per separate tool.
 - Pantry/fridge: one box per separate package/container/product.
-- Sports equipment: one box per separate piece of equipment.
+- Sports equipment: one box per separate item.
 - Clothing: one box per visually separate garment when practical.
-- Do NOT divide the image into arbitrary grid regions.
-- Do NOT return the shelf, cupboard, room, drawer, rack, table, or storage furniture unless it is itself clearly the intended object.
-- Do NOT merge several neighboring products into one box.
-- Skip background clutter or items that are too obscured to separate visually.
-- Avoid duplicate boxes for the same object.
-- Return at most 60 detections.
+- Do NOT return the shelf, cupboard, room, drawer, rack, table, or storage
+  furniture unless it is itself the intended inventory object.
+- Do NOT merge a row/group of products into one box.
+- Avoid duplicate boxes for the same physical object.
+- Return up to 100 detections.
 ''';
 
     final decoded = await _generateJson(
@@ -149,7 +175,7 @@ Collection rules:
       mimeType: mimeType,
       schema: detectionSchema,
       prompt: prompt,
-      timeout: const Duration(seconds: 60),
+      timeout: const Duration(seconds: 70),
     );
 
     final rawObjects = decoded['objects'];
@@ -164,8 +190,8 @@ Collection rules:
             Map<String, dynamic>.from(item),
           ),
         )
-        .where((item) => item.hasValidBox && item.confidence >= 35)
-        .take(60)
+        .where((item) => item.hasValidBox && item.confidence >= 20)
+        .take(100)
         .toList();
   }
 
