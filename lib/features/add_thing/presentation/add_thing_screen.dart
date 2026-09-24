@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../inventory/data/thing_repository.dart';
+import '../../inventory/domain/thing.dart';
 import '../data/thing_ai_service.dart';
 import '../domain/thing_recognition.dart';
 
@@ -59,6 +60,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
   ThingRecognition? _recognition;
   String _category = 'other';
   String _condition = 'unknown';
+  Set<ThingAction> _enabledActions = {ThingAction.personalUse};
   bool _busy = false;
   String? _status;
 
@@ -206,6 +208,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
         description: _descriptionController.text,
         estimatedNewPriceIls: _parsePrice(_newPriceController.text),
         estimatedCurrentValueIls: _parsePrice(_usedPriceController.text),
+        enabledActions: _enabledActions,
       );
 
       if (!mounted) {
@@ -235,6 +238,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
       _recognition = null;
       _category = 'other';
       _condition = 'unknown';
+      _enabledActions = {ThingAction.personalUse};
       _clearRecognitionFields();
     });
   }
@@ -249,6 +253,20 @@ class _AddThingScreenState extends State<AddThingScreen> {
     _descriptionController.clear();
     _category = 'other';
     _condition = 'unknown';
+  }
+
+  void _toggleAction(ThingAction action, bool selected) {
+    setState(() {
+      if (selected) {
+        _enabledActions.add(action);
+      } else {
+        _enabledActions.remove(action);
+      }
+
+      if (_enabledActions.isEmpty) {
+        _enabledActions.add(ThingAction.personalUse);
+      }
+    });
   }
 
   int _parsePrice(String value) {
@@ -418,6 +436,67 @@ class _AddThingScreenState extends State<AddThingScreen> {
               onConditionChanged: (value) {
                 if (value != null) setState(() => _condition = value);
               },
+            ),
+            const SizedBox(height: 18),
+            Text(
+              'What can others do with this Thing?',
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 6),
+            Text(
+              'Choose one or more. Personal use stays private unless you also select a marketplace option.',
+              style: Theme.of(context).textTheme.bodySmall,
+            ),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ThingActionChip(
+                  action: ThingAction.personalUse,
+                  label: 'Personal use',
+                  icon: Icons.home_outlined,
+                  selected: _enabledActions.contains(ThingAction.personalUse),
+                  onSelected: _toggleAction,
+                ),
+                _ThingActionChip(
+                  action: ThingAction.sell,
+                  label: 'Sell',
+                  icon: Icons.sell_outlined,
+                  selected: _enabledActions.contains(ThingAction.sell),
+                  onSelected: _toggleAction,
+                ),
+                _ThingActionChip(
+                  action: ThingAction.rent,
+                  label: 'Rent',
+                  icon: Icons.payments_outlined,
+                  selected: _enabledActions.contains(ThingAction.rent),
+                  onSelected: _toggleAction,
+                ),
+                _ThingActionChip(
+                  action: ThingAction.borrow,
+                  label: 'Lend',
+                  icon: Icons.handshake_outlined,
+                  selected: _enabledActions.contains(ThingAction.borrow),
+                  onSelected: _toggleAction,
+                ),
+                _ThingActionChip(
+                  action: ThingAction.give,
+                  label: 'Give away',
+                  icon: Icons.volunteer_activism_outlined,
+                  selected: _enabledActions.contains(ThingAction.give),
+                  onSelected: _toggleAction,
+                ),
+                _ThingActionChip(
+                  action: ThingAction.exchange,
+                  label: 'Exchange',
+                  icon: Icons.swap_horiz,
+                  selected: _enabledActions.contains(ThingAction.exchange),
+                  onSelected: _toggleAction,
+                ),
+              ],
             ),
             const SizedBox(height: 22),
             FilledButton.icon(
@@ -678,6 +757,33 @@ class _ActionCard extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+class _ThingActionChip extends StatelessWidget {
+  const _ThingActionChip({
+    required this.action,
+    required this.label,
+    required this.icon,
+    required this.selected,
+    required this.onSelected,
+  });
+
+  final ThingAction action;
+  final String label;
+  final IconData icon;
+  final bool selected;
+  final void Function(ThingAction action, bool selected) onSelected;
+
+  @override
+  Widget build(BuildContext context) {
+    return FilterChip(
+      selected: selected,
+      avatar: Icon(icon, size: 18),
+      label: Text(label),
+      onSelected: (value) => onSelected(action, value),
     );
   }
 }
