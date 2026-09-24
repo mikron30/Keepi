@@ -6,7 +6,8 @@ import 'package:go_router/go_router.dart';
 import 'package:image_picker/image_picker.dart';
 
 import '../../inventory/data/thing_repository.dart';
-import '../data/thing_ai_service.dart';
+import '../data/multi_item_scan_service.dart';
+import '../domain/scanned_thing_candidate.dart';
 import '../domain/thing_recognition.dart';
 
 class MultiScanScreen extends StatefulWidget {
@@ -19,20 +20,23 @@ class MultiScanScreen extends StatefulWidget {
 class _MultiScanScreenState extends State<MultiScanScreen> {
   final _picker = ImagePicker();
   final _repository = ThingRepository();
+  final _scanService = const MultiItemScanService();
 
   Uint8List? _imageBytes;
   String _mimeType = 'image/jpeg';
   String? _imageName;
   List<_DetectedThingDraft> _drafts = [];
+  MultiScanProgress? _scanProgress;
+
   bool _busy = false;
   String? _status;
-  Timer? _progressTimer;
-  int _elapsedSeconds = 0;
-  bool _scanningWithAi = false;
+  Timer? _ticker;
+  DateTime? _scanStartedAt;
+  int _liveElapsedSeconds = 0;
 
   @override
   void dispose() {
-    _progressTimer?.cancel();
+    _ticker?.cancel();
     for (final draft in _drafts) {
       draft.dispose();
     }
@@ -49,12 +53,13 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
       _status = source == ImageSource.camera
           ? 'Opening camera...'
           : 'Opening gallery...';
+      _scanProgress = null;
     });
 
     try {
       final image = await _picker.pickImage(
         source: source,
-        imageQuality: 88,
+        imageQuality: 90,
         maxWidth: 2200,
       );
 
@@ -64,59 +69,80 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
 
       final bytes = await image.readAsBytes();
 
-      if (!mounted) {
-        return;
-      }
-
-      setState(() {
-        _imageBytes = bytes;
-        _imageName = image.name;
-        _mimeType = image.mimeType ?? _guessMimeType(image.name);
-        _status = 'Preparing image for AI...';
-        _scanningWithAi = true;
-        _elapsedSeconds = 0;
-      });
-      _startProgressTimer();
-
-      final recognized = await ThingAiService.recognizeMultiple(
-        imageBytes: bytes,
-        mimeType: _mimeType,
-      );
-
-      if (!mounted) {
-        return;
-      }
-
       for (final draft in _drafts) {
         draft.dispose();
       }
 
+      if (!mounted) {
+        return;
+      }
+
       setState(() {
-        _drafts = recognized.map(_DetectedThingDraft.new).toList();
-        _status = 'Found ${recognized.length} Things.';
-        _scanningWithAi = false;
+        _drafts = [];
+        _imageBytes = bytes;
+        _imageName = image.name;
+        _mimeType = image.mimeType ?? _guessMimeType(image.name);
+        _status = 'Preparing image...';
+        _scanStartedAt = DateTime.now();
+        _liveElapsedSeconds = 0;
       });
-      _stopProgressTimer();
+
+      _startTicker();
+
+      MultiScanProgress? finalProgress;
+
+      await for (final progress in _scanService.scan(imageBytes: bytes)) {
+        finalProgress = progress;
+
+        if (!mounted) {
+          return;
+        }
+
+        setState(() {
+          _scanProgress = progress;
+          _status = progress.message;
+        });
+      }
+
+      if (!mounted || finalProgress == null) {
+        return;
+      }
+
+      if (finalProgress.stage == MultiScanStage.failed) {
+        _showMessage(
+          _friendlyScanError(
+            finalProgress.errorMessage ?? 'Unknown scan error',
+          ),
+        );
+        return;
+      }
+
+      final candidates = finalProgress.items;
+
+      setState(() {
+        _drafts = candidates.map(_DetectedThingDraft.new).toList();
+        _status = 'Found ${candidates.length} Things.';
+      });
 
       if (_drafts.isEmpty) {
         _showMessage(
           'Keepi could not confidently identify separate items. '
           'Try a closer, sharper photo.',
         );
+      } else if (finalProgress.failedTiles > 0) {
+        _showMessage(
+          'Found ${candidates.length} Things. '
+          '${finalProgress.failedTiles} scan area(s) could not be read.',
+        );
       }
     } catch (error) {
-      _stopProgressTimer();
-      if (mounted) {
-        setState(() => _scanningWithAi = false);
-      }
       _showMessage(_friendlyScanError(error));
     } finally {
+      _stopTicker();
+
       if (mounted) {
         setState(() {
           _busy = false;
-          if (!_scanningWithAi && _drafts.isEmpty) {
-            _status = null;
-          }
         });
       }
     }
@@ -130,8 +156,8 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
 
     final selected = _drafts
         .where((draft) => draft.selected)
-        .map((draft) => draft.toRecognition())
-        .where((item) => item.name.trim().isNotEmpty)
+        .map((draft) => draft.toCandidate())
+        .where((candidate) => candidate.recognition.name.trim().isNotEmpty)
         .toList();
 
     if (selected.isEmpty) {
@@ -145,10 +171,10 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     });
 
     try {
-      final count = await _repository.createThingsFromScan(
-        imageBytes: bytes,
-        mimeType: _mimeType,
-        recognitions: selected,
+      final count = await _repository.createThingsFromMultiScan(
+        sourceImageBytes: bytes,
+        sourceMimeType: _mimeType,
+        candidates: selected,
       );
 
       if (!mounted) {
@@ -177,56 +203,39 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     draft.dispose();
   }
 
-  void _startProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (!mounted || !_scanningWithAi) return;
+  void _startTicker() {
+    _ticker?.cancel();
+    _ticker = Timer.periodic(const Duration(seconds: 1), (_) {
+      final startedAt = _scanStartedAt;
+      if (!mounted || startedAt == null || !_busy) {
+        return;
+      }
+
       setState(() {
-        _elapsedSeconds++;
-        _status = _progressStage(_elapsedSeconds);
+        _liveElapsedSeconds =
+            DateTime.now().difference(startedAt).inSeconds;
       });
     });
   }
 
-  void _stopProgressTimer() {
-    _progressTimer?.cancel();
-    _progressTimer = null;
-  }
-
-  String _progressStage(int seconds) {
-    if (seconds < 5) return 'Uploading image securely...';
-    if (seconds < 15) return 'Looking for separate objects and book spines...';
-    if (seconds < 30) return 'Reading names, titles and labels...';
-    if (seconds < 50) return 'Building the inventory list...';
-    return 'Still analyzing a detailed image — almost there...';
-  }
-
-  double _estimatedProgress() {
-    if (!_scanningWithAi) return 1;
-    // This is an honest time-based estimate; Gemini returns item count only
-    // when the structured response is complete.
-    final value = 0.08 + (_elapsedSeconds / 75) * 0.84;
-    return value.clamp(0.08, 0.92);
-  }
-
-  String _progressDetail() {
-    if (!_scanningWithAi) return '';
-    final remaining = (60 - _elapsedSeconds).clamp(0, 60);
-    if (_elapsedSeconds < 60) {
-      return '${_elapsedSeconds}s elapsed · usually ~${remaining}s remaining';
-    }
-    return '${_elapsedSeconds}s elapsed · detailed scans can take longer';
+  void _stopTicker() {
+    _ticker?.cancel();
+    _ticker = null;
   }
 
   String _friendlyScanError(Object error) {
-    final message = error.toString().toLowerCase();
-    if (message.contains('failed to fetch') ||
-        message.contains('clientexception')) {
-      return 'Keepi could not reach Firebase AI Logic. '
-          'Check the Firebase AI Logic API permission for the web API key, '
-          'App Check, and your internet connection, then try again.';
+    final message = error.toString();
+    final lower = message.toLowerCase();
+
+    if (lower.contains('failed to fetch') ||
+        lower.contains('clientexception') ||
+        lower.contains('all scan areas failed')) {
+      return 'Keepi could not complete the AI scan. '
+          'The image was split into smaller areas, but the AI connection '
+          'failed. Check your connection and try again.';
     }
-    return 'Multi-item scan failed: $error';
+
+    return 'Multi-item scan failed: $message';
   }
 
   String _guessMimeType(String fileName) {
@@ -234,6 +243,16 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
     return 'image/jpeg';
+  }
+
+  String _formatDuration(Duration? duration) {
+    if (duration == null) {
+      return '—';
+    }
+
+    final minutes = duration.inMinutes;
+    final seconds = duration.inSeconds % 60;
+    return '$minutes:${seconds.toString().padLeft(2, '0')}';
   }
 
   void _showMessage(String message) {
@@ -266,8 +285,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Great for bookshelves, tool racks, cupboards, closets and rooms. '
-            'Keepi creates a separate inventory item for each thing it can identify.',
+            'Great for bookshelves, shoes, tool racks, cupboards, closets '
+            'and rooms. Keepi splits the photo into smaller scan areas and '
+            'identifies them one by one.',
           ),
           const SizedBox(height: 18),
           if (_imageBytes != null) ...[
@@ -312,7 +332,26 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                 minimumSize: const Size.fromHeight(54),
               ),
             ),
-          ] else ...[
+          ],
+          if (_scanProgress != null) ...[
+            const SizedBox(height: 20),
+            _ScanProgressCard(
+              progress: _scanProgress!,
+              liveElapsed: Duration(seconds: _liveElapsedSeconds),
+              formatDuration: _formatDuration,
+            ),
+          ] else if (_busy) ...[
+            const SizedBox(height: 22),
+            const LinearProgressIndicator(),
+            const SizedBox(height: 10),
+            Text(
+              _status ?? 'Working...',
+              textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+          if (_drafts.isNotEmpty) ...[
+            const SizedBox(height: 20),
             Row(
               children: [
                 Expanded(
@@ -340,6 +379,7 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
             const SizedBox(height: 8),
             ...List.generate(_drafts.length, (index) {
               final draft = _drafts[index];
+
               return Padding(
                 padding: const EdgeInsets.only(bottom: 10),
                 child: Card(
@@ -358,6 +398,16 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                                   });
                                 },
                         ),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: Image.memory(
+                            draft.candidate.tileBytes,
+                            width: 58,
+                            height: 58,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                        const SizedBox(width: 10),
                         Expanded(
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -373,10 +423,14 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                               const SizedBox(height: 6),
                               Text(
                                 [
-                                  _pretty(draft.recognition.categoryId),
-                                  if (draft.recognition.subcategory.isNotEmpty)
-                                    draft.recognition.subcategory,
-                                  'AI ${draft.recognition.confidence}%',
+                                  _pretty(
+                                    draft.candidate.recognition.categoryId,
+                                  ),
+                                  if (draft.candidate.recognition.subcategory
+                                      .isNotEmpty)
+                                    draft.candidate.recognition.subcategory,
+                                  'AI ${draft.candidate.recognition.confidence}%',
+                                  'Area ${draft.candidate.tileIndex}',
                                 ].join(' · '),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
@@ -412,32 +466,6 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
               label: const Text('Scan another photo'),
             ),
           ],
-          if (_busy) ...[
-            const SizedBox(height: 22),
-            LinearProgressIndicator(
-              value: _scanningWithAi ? _estimatedProgress() : null,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              _status ?? 'Working...',
-              textAlign: TextAlign.center,
-              style: const TextStyle(fontWeight: FontWeight.w700),
-            ),
-            if (_scanningWithAi) ...[
-              const SizedBox(height: 4),
-              Text(
-                _progressDetail(),
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-              const SizedBox(height: 4),
-              Text(
-                'Detected item count appears when AI finishes this pass.',
-                textAlign: TextAlign.center,
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ],
         ],
       ),
     );
@@ -455,27 +483,161 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
   }
 }
 
-class _DetectedThingDraft {
-  _DetectedThingDraft(this.recognition)
-      : nameController = TextEditingController(text: recognition.name);
+class _ScanProgressCard extends StatelessWidget {
+  const _ScanProgressCard({
+    required this.progress,
+    required this.liveElapsed,
+    required this.formatDuration,
+  });
 
-  final ThingRecognition recognition;
+  final MultiScanProgress progress;
+  final Duration liveElapsed;
+  final String Function(Duration? duration) formatDuration;
+
+  @override
+  Widget build(BuildContext context) {
+    final elapsed = liveElapsed > progress.elapsed
+        ? liveElapsed
+        : progress.elapsed;
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              progress.message,
+              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 12),
+            LinearProgressIndicator(
+              value: progress.stage == MultiScanStage.failed
+                  ? null
+                  : progress.progress,
+              minHeight: 8,
+              borderRadius: BorderRadius.circular(20),
+            ),
+            const SizedBox(height: 14),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: [
+                _ProgressChip(
+                  icon: Icons.grid_view_outlined,
+                  label: progress.totalTiles == 0
+                      ? 'Finding areas'
+                      : '${progress.totalTiles} areas',
+                ),
+                _ProgressChip(
+                  icon: Icons.center_focus_strong,
+                  label: progress.currentTile == 0
+                      ? 'Preparing'
+                      : 'Area ${progress.currentTile}/${progress.totalTiles}',
+                ),
+                _ProgressChip(
+                  icon: Icons.inventory_2_outlined,
+                  label: '${progress.itemCount} items found',
+                ),
+                _ProgressChip(
+                  icon: Icons.timer_outlined,
+                  label: '${formatDuration(elapsed)} elapsed',
+                ),
+                if (progress.estimatedRemaining != null &&
+                    progress.stage == MultiScanStage.scanning)
+                  _ProgressChip(
+                    icon: Icons.hourglass_bottom,
+                    label:
+                        '~${formatDuration(progress.estimatedRemaining)} left',
+                  ),
+                if (progress.failedTiles > 0)
+                  _ProgressChip(
+                    icon: Icons.warning_amber_rounded,
+                    label: '${progress.failedTiles} area(s) retried/failed',
+                  ),
+              ],
+            ),
+            if (progress.logs.isNotEmpty) ...[
+              const SizedBox(height: 14),
+              Text(
+                'Live activity',
+                style: Theme.of(context).textTheme.labelLarge,
+              ),
+              const SizedBox(height: 6),
+              ...progress.logs.reversed.take(4).map(
+                    (line) => Padding(
+                      padding: const EdgeInsets.only(bottom: 4),
+                      child: Text(
+                        '• $line',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ),
+                  ),
+            ],
+            if (progress.errorMessage != null) ...[
+              const SizedBox(height: 10),
+              Text(
+                progress.errorMessage!,
+                style: TextStyle(
+                  color: Theme.of(context).colorScheme.error,
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ProgressChip extends StatelessWidget {
+  const _ProgressChip({
+    required this.icon,
+    required this.label,
+  });
+
+  final IconData icon;
+  final String label;
+
+  @override
+  Widget build(BuildContext context) {
+    return Chip(
+      avatar: Icon(icon, size: 17),
+      label: Text(label),
+      visualDensity: VisualDensity.compact,
+    );
+  }
+}
+
+class _DetectedThingDraft {
+  _DetectedThingDraft(this.candidate)
+      : nameController = TextEditingController(
+          text: candidate.recognition.name,
+        );
+
+  final ScannedThingCandidate candidate;
   final TextEditingController nameController;
   bool selected = true;
 
-  ThingRecognition toRecognition() {
-    return ThingRecognition(
-      name: nameController.text.trim(),
-      categoryId: recognition.categoryId,
-      subcategory: recognition.subcategory,
-      brand: recognition.brand,
-      model: recognition.model,
-      condition: recognition.condition,
-      description: recognition.description,
-      estimatedNewPriceIls: recognition.estimatedNewPriceIls,
-      estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
-      confidence: recognition.confidence,
-      searchKeywords: recognition.searchKeywords,
+  ScannedThingCandidate toCandidate() {
+    final recognition = candidate.recognition;
+
+    return candidate.copyWith(
+      recognition: ThingRecognition(
+        name: nameController.text.trim(),
+        categoryId: recognition.categoryId,
+        subcategory: recognition.subcategory,
+        brand: recognition.brand,
+        model: recognition.model,
+        condition: recognition.condition,
+        description: recognition.description,
+        estimatedNewPriceIls: recognition.estimatedNewPriceIls,
+        estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
+        confidence: recognition.confidence,
+        searchKeywords: recognition.searchKeywords,
+      ),
     );
   }
 
