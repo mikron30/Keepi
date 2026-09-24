@@ -26,20 +26,40 @@ class ThingDetection {
 
     int normalized(dynamic value) => toInt(value).clamp(0, 1000);
 
-    final left = normalized(json['xMin']);
-    final top = normalized(json['yMin']);
-    final right = normalized(json['xMax']);
-    final bottom = normalized(json['yMax']);
+    // Gemini vision commonly represents a box as
+    // [yMin, xMin, yMax, xMax] in a normalized 0..1000 coordinate system.
+    // Keep supporting the older explicit fields as a fallback.
+    final rawBox = json['box2d'];
+    if (rawBox is List && rawBox.length >= 4) {
+      final yMin = normalized(rawBox[0]);
+      final xMin = normalized(rawBox[1]);
+      final yMax = normalized(rawBox[2]);
+      final xMax = normalized(rawBox[3]);
+
+      return ThingDetection(
+        hint: (json['hint'] ?? 'item').toString().trim(),
+        xMin: xMin,
+        yMin: yMin,
+        xMax: xMax,
+        yMax: yMax,
+        confidence: toInt(json['confidence']).clamp(0, 100),
+      );
+    }
 
     return ThingDetection(
       hint: (json['hint'] ?? 'item').toString().trim(),
-      xMin: left,
-      yMin: top,
-      xMax: right,
-      yMax: bottom,
+      xMin: normalized(json['xMin']),
+      yMin: normalized(json['yMin']),
+      xMax: normalized(json['xMax']),
+      yMax: normalized(json['yMax']),
       confidence: toInt(json['confidence']).clamp(0, 100),
     );
   }
 
   bool get hasValidBox => xMax > xMin && yMax > yMin;
+
+  int get width => xMax - xMin;
+  int get height => yMax - yMin;
+
+  double get normalizedArea => (width * height) / 1000000;
 }
