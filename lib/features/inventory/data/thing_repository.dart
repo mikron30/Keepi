@@ -90,6 +90,7 @@ class ThingRepository {
           _thingMap(
             id: document.id,
             ownerId: user.uid,
+            ownerDisplayName: _displayNameFor(user),
             recognition: recognition,
             name: name,
             categoryId: categoryId,
@@ -152,6 +153,7 @@ class ThingRepository {
         _thingMap(
           id: document.id,
           ownerId: user.uid,
+          ownerDisplayName: _displayNameFor(user),
           recognition: recognition,
           name: recognition.name,
           categoryId: recognition.categoryId,
@@ -263,6 +265,7 @@ class ThingRepository {
   Map<String, dynamic> _thingMap({
     required String id,
     required String ownerId,
+    required String ownerDisplayName,
     required ThingRecognition recognition,
     required String name,
     required String categoryId,
@@ -284,6 +287,7 @@ class ThingRepository {
     return {
       'id': id,
       'ownerId': ownerId,
+      'ownerDisplayName': ownerDisplayName,
       'name': name.trim(),
       'categoryId': categoryId.trim().isEmpty ? 'other' : categoryId.trim(),
       'subcategoryId': subcategory.trim().isEmpty ? null : subcategory.trim(),
@@ -331,6 +335,20 @@ class ThingRepository {
         'model': 'agent-platform-gemini',
       },
     };
+  }
+
+  String _displayNameFor(User user) {
+    final displayName = user.displayName?.trim();
+    if (displayName != null && displayName.isNotEmpty) {
+      return displayName;
+    }
+
+    final email = user.email?.trim();
+    if (email != null && email.isNotEmpty) {
+      return email.split('@').first;
+    }
+
+    return 'Keepi user';
   }
 
   User _requireUser() {
