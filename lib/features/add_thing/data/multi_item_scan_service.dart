@@ -54,8 +54,8 @@ class MultiScanProgress {
 
 class MultiItemScanService {
   const MultiItemScanService({
-    this.jpegQuality = 90,
-    this.cropPaddingRatio = 0.08,
+    this.jpegQuality = 92,
+    this.cropPaddingRatio = 0.025,
   });
 
   final int jpegQuality;
@@ -127,22 +127,67 @@ class MultiItemScanService {
         img.encodeJpg(source, quality: jpegQuality),
       );
 
-      log('AI is locating separate products');
+      log('AI localization pass 1');
       yield buildProgress(
         stage: MultiScanStage.locating,
-        message: 'AI is finding separate products...',
-        value: 0.08,
+        message: 'AI is finding every separate product...',
+        value: 0.06,
         completedItems: 0,
         currentItem: 0,
       );
 
-      final rawDetections = await ThingAiService.detectThings(
+      final firstPass = await ThingAiService.detectThings(
         imageBytes: normalizedBytes,
         mimeType: 'image/jpeg',
+        pass: 1,
       );
 
-      final detections = _prepareDetections(rawDetections);
+      var detections = _prepareDetections(firstPass);
+      final dominantHint = _dominantHint(detections);
       totalDetected = detections.length;
+
+      log('First pass found $totalDetected products');
+      yield buildProgress(
+        stage: MultiScanStage.locating,
+        message: 'Found $totalDetected products · checking for missed items...',
+        value: 0.10,
+        completedItems: 0,
+        currentItem: 0,
+      );
+
+      final secondPass = await ThingAiService.detectThings(
+        imageBytes: normalizedBytes,
+        mimeType: 'image/jpeg',
+        pass: 2,
+        dominantHint: dominantHint,
+      );
+
+      detections = _mergeDetectionPasses(detections, secondPass);
+      totalDetected = detections.length;
+
+      final denseCollection = _isDenseCollection(detections, dominantHint);
+
+      if (denseCollection && totalDetected < 80) {
+        log('Dense collection detected · deep localization pass');
+        yield buildProgress(
+          stage: MultiScanStage.locating,
+          message:
+              'Found $totalDetected products · running deep collection scan...',
+          value: 0.14,
+          completedItems: 0,
+          currentItem: 0,
+        );
+
+        final thirdPass = await ThingAiService.detectThings(
+          imageBytes: normalizedBytes,
+          mimeType: 'image/jpeg',
+          pass: 3,
+          dominantHint: dominantHint,
+        );
+
+        detections = _mergeDetectionPasses(detections, thirdPass);
+        totalDetected = detections.length;
+      }
 
       if (detections.isEmpty) {
         throw StateError(
@@ -150,30 +195,30 @@ class MultiItemScanService {
         );
       }
 
-      log('AI found $totalDetected separate products');
+      log('AI finalized $totalDetected separate products');
       yield buildProgress(
         stage: MultiScanStage.cropping,
         message: 'Found $totalDetected products · creating individual crops...',
-        value: 0.16,
+        value: 0.18,
         completedItems: 0,
         currentItem: 0,
       );
 
       final crops = <_DetectedCrop>[];
-      for (var i = 0; i < detections.length; i++) {
-        final detection = detections[i];
-        final crop = _cropDetection(
-          source: source,
-          detection: detection,
+      for (final detection in detections) {
+        crops.add(
+          _cropDetection(
+            source: source,
+            detection: detection,
+          ),
         );
-        crops.add(crop);
       }
 
-      log('Created ${crops.length} product images');
+      log('Created ${crops.length} product crops');
       yield buildProgress(
         stage: MultiScanStage.cropping,
         message: 'Created ${crops.length} individual product images',
-        value: 0.20,
+        value: 0.22,
         completedItems: 0,
         currentItem: 0,
       );
@@ -293,22 +338,51 @@ class MultiItemScanService {
   List<ThingDetection> _prepareDetections(
     List<ThingDetection> rawDetections,
   ) {
-    final sorted = rawDetections
-        .where((detection) => detection.hasValidBox)
-        .toList()
+    final cleaned = rawDetections.where((detection) {
+      if (!detection.hasValidBox) {
+        return false;
+      }
+
+      final hint = _normalizeHint(detection.hint);
+      if (detection.normalizedArea > 0.62) {
+        return false;
+      }
+      if (_isNarrowCollectionItem(hint) && detection.normalizedArea > 0.18) {
+        return false;
+      }
+
+      return true;
+    }).toList()
       ..sort((a, b) {
-        final yCompare = a.yMin.compareTo(b.yMin);
-        if ((a.yMin - b.yMin).abs() < 40) {
+        if ((a.yMin - b.yMin).abs() < 35) {
           return a.xMin.compareTo(b.xMin);
         }
-        return yCompare;
+        return a.yMin.compareTo(b.yMin);
       });
 
+    return _dedupeDetections(cleaned).take(100).toList();
+  }
+
+  List<ThingDetection> _mergeDetectionPasses(
+    List<ThingDetection> existing,
+    List<ThingDetection> incoming,
+  ) {
+    final merged = <ThingDetection>[
+      ...existing,
+      ...incoming.where((item) => item.hasValidBox),
+    ];
+
+    return _prepareDetections(merged);
+  }
+
+  List<ThingDetection> _dedupeDetections(
+    List<ThingDetection> detections,
+  ) {
     final result = <ThingDetection>[];
 
-    for (final detection in sorted) {
+    for (final detection in detections) {
       final duplicateIndex = result.indexWhere(
-        (existing) => _intersectionOverUnion(existing, detection) >= 0.72,
+        (existing) => _intersectionOverUnion(existing, detection) >= 0.68,
       );
 
       if (duplicateIndex == -1) {
@@ -318,7 +392,63 @@ class MultiItemScanService {
       }
     }
 
-    return result.take(60).toList();
+    return result;
+  }
+
+  String? _dominantHint(List<ThingDetection> detections) {
+    if (detections.isEmpty) {
+      return null;
+    }
+
+    final counts = <String, int>{};
+    for (final detection in detections) {
+      final hint = _normalizeHint(detection.hint);
+      if (hint.isEmpty || hint == 'item' || hint == 'object') {
+        continue;
+      }
+      counts[hint] = (counts[hint] ?? 0) + 1;
+    }
+
+    if (counts.isEmpty) {
+      return null;
+    }
+
+    final entries = counts.entries.toList()
+      ..sort((a, b) => b.value.compareTo(a.value));
+
+    return entries.first.key;
+  }
+
+  bool _isDenseCollection(
+    List<ThingDetection> detections,
+    String? dominantHint,
+  ) {
+    if (detections.length >= 12) {
+      return true;
+    }
+
+    final hint = dominantHint ?? '';
+    return detections.length >= 6 &&
+        (hint.contains('book') ||
+            hint.contains('shoe') ||
+            hint.contains('bottle') ||
+            hint.contains('tool') ||
+            hint.contains('can') ||
+            hint.contains('box'));
+  }
+
+  bool _isNarrowCollectionItem(String hint) {
+    return hint.contains('book') ||
+        hint.contains('bottle') ||
+        hint.contains('can') ||
+        hint.contains('tool');
+  }
+
+  String _normalizeHint(String value) {
+    return value
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9א-ת ]+'), ' ')
+        .trim();
   }
 
   _DetectedCrop _cropDetection({
@@ -339,8 +469,8 @@ class MultiItemScanService {
     final rawWidth = math.max(1, rawRight - rawLeft);
     final rawHeight = math.max(1, rawBottom - rawTop);
 
-    final padX = math.max(10, (rawWidth * cropPaddingRatio).round());
-    final padY = math.max(8, (rawHeight * cropPaddingRatio).round());
+    final padX = math.max(2, (rawWidth * cropPaddingRatio).round());
+    final padY = math.max(2, (rawHeight * cropPaddingRatio).round());
 
     final left = math.max(0, rawLeft - padX);
     final top = math.max(0, rawTop - padY);
@@ -367,8 +497,8 @@ class MultiItemScanService {
     int completedItems,
     int totalItems,
   ) {
-    const start = 0.20;
-    const span = 0.78;
+    const start = 0.22;
+    const span = 0.76;
 
     if (totalItems <= 0) {
       return start;
