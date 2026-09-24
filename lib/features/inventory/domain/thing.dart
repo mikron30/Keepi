@@ -37,6 +37,7 @@ class Thing {
     this.description,
     this.subcategoryId,
     this.photoUrls = const [],
+    this.thumbnailUrl,
     this.attributes = const {},
     this.searchKeywords = const [],
     this.quantity = 1,
@@ -65,6 +66,7 @@ class Thing {
   final String? subcategoryId;
   final String? description;
   final List<String> photoUrls;
+  final String? thumbnailUrl;
   final Map<String, dynamic> attributes;
   final List<String> searchKeywords;
   final int quantity;
@@ -127,6 +129,7 @@ class Thing {
       photoUrls: (data['photoUrls'] as List<dynamic>? ?? const [])
           .map((value) => value.toString())
           .toList(),
+      thumbnailUrl: data['thumbnailUrl']?.toString(),
       attributes: Map<String, dynamic>.from(
         data['attributes'] as Map? ?? const <String, dynamic>{},
       ),
@@ -171,6 +174,7 @@ class Thing {
       'subcategoryId': subcategoryId,
       'description': description,
       'photoUrls': photoUrls,
+      'thumbnailUrl': thumbnailUrl,
       'attributes': attributes,
       'searchKeywords': searchKeywords,
       'quantity': quantity,
