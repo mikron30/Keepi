@@ -98,6 +98,7 @@ Rules:
     required String mimeType,
     int pass = 1,
     String? dominantHint,
+    List<ThingDetection> existingDetections = const [],
   }) async {
     final detectionSchema = Schema.object(
       properties: {
@@ -133,6 +134,25 @@ Be especially exhaustive for that object type. Return ONE box per physical
 item, even when many similar items are tightly packed next to each other.
 ''';
 
+    final existingInstruction = existingDetections.isEmpty
+        ? ''
+        : '''
+These boxes were already found in earlier passes:
+__EXISTING_BOXES__
+
+Return ONLY genuinely missing physical items. Do not return another box for an
+already-listed object merely because you would draw its box a little differently.
+'''.replaceFirst(
+          '__EXISTING_BOXES__',
+          existingDetections
+              .take(100)
+              .map(
+                (d) =>
+                    '[${d.yMin},${d.xMin},${d.yMax},${d.xMax}] ${d.hint}',
+              )
+              .join('\n'),
+        );
+
     final prompt = '''
 You are the object-localization stage of Keepi, a household inventory app.
 
@@ -141,6 +161,7 @@ its own inventory entry. Do not divide the image into a grid.
 
 $passInstruction
 $collectionInstruction
+$existingInstruction
 
 Return ONLY lightweight detections. Detailed product identification happens in
 a later call on each crop.
@@ -379,7 +400,7 @@ Rules:
         ),
       );
 
-      for (var attempt = 1; attempt <= 2; attempt++) {
+      for (var attempt = 1; attempt <= 3; attempt++) {
         try {
           final response = await model.generateContent([
             Content.multi([
@@ -406,8 +427,10 @@ Rules:
             rethrow;
           }
 
-          if (attempt < 2) {
-            await Future<void>.delayed(Duration(seconds: attempt * 2));
+          if (attempt < 3) {
+            await Future<void>.delayed(
+              Duration(seconds: attempt == 1 ? 2 : 5),
+            );
           }
         }
       }
@@ -433,6 +456,12 @@ Rules:
         message.contains('failed to fetch') ||
         message.contains('clientexception') ||
         message.contains('network error') ||
-        message.contains('connection reset');
+        message.contains('connection reset') ||
+        message.contains('429') ||
+        message.contains('resource_exhausted') ||
+        message.contains('resource exhausted') ||
+        message.contains('too many requests') ||
+        message.contains('rate limit') ||
+        message.contains('quota');
   }
 }
