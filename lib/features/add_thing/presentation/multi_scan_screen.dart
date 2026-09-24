@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:typed_data';
 
 import 'package:flutter/material.dart';
@@ -25,9 +26,13 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
   List<_DetectedThingDraft> _drafts = [];
   bool _busy = false;
   String? _status;
+  Timer? _progressTimer;
+  int _elapsedSeconds = 0;
+  bool _scanningWithAi = false;
 
   @override
   void dispose() {
+    _progressTimer?.cancel();
     for (final draft in _drafts) {
       draft.dispose();
     }
@@ -67,8 +72,11 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
         _imageBytes = bytes;
         _imageName = image.name;
         _mimeType = image.mimeType ?? _guessMimeType(image.name);
-        _status = 'Keepi is finding all visible Things...';
+        _status = 'Preparing image for AI...';
+        _scanningWithAi = true;
+        _elapsedSeconds = 0;
       });
+      _startProgressTimer();
 
       final recognized = await ThingAiService.recognizeMultiple(
         imageBytes: bytes,
@@ -85,8 +93,10 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
 
       setState(() {
         _drafts = recognized.map(_DetectedThingDraft.new).toList();
-        _status = null;
+        _status = 'Found ${recognized.length} Things.';
+        _scanningWithAi = false;
       });
+      _stopProgressTimer();
 
       if (_drafts.isEmpty) {
         _showMessage(
@@ -95,12 +105,18 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
         );
       }
     } catch (error) {
-      _showMessage('Multi-item scan failed: $error');
+      _stopProgressTimer();
+      if (mounted) {
+        setState(() => _scanningWithAi = false);
+      }
+      _showMessage(_friendlyScanError(error));
     } finally {
       if (mounted) {
         setState(() {
           _busy = false;
-          _status = null;
+          if (!_scanningWithAi && _drafts.isEmpty) {
+            _status = null;
+          }
         });
       }
     }
@@ -159,6 +175,58 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
       _drafts.removeAt(index);
     });
     draft.dispose();
+  }
+
+  void _startProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || !_scanningWithAi) return;
+      setState(() {
+        _elapsedSeconds++;
+        _status = _progressStage(_elapsedSeconds);
+      });
+    });
+  }
+
+  void _stopProgressTimer() {
+    _progressTimer?.cancel();
+    _progressTimer = null;
+  }
+
+  String _progressStage(int seconds) {
+    if (seconds < 5) return 'Uploading image securely...';
+    if (seconds < 15) return 'Looking for separate objects and book spines...';
+    if (seconds < 30) return 'Reading names, titles and labels...';
+    if (seconds < 50) return 'Building the inventory list...';
+    return 'Still analyzing a detailed image — almost there...';
+  }
+
+  double _estimatedProgress() {
+    if (!_scanningWithAi) return 1;
+    // This is an honest time-based estimate; Gemini returns item count only
+    // when the structured response is complete.
+    final value = 0.08 + (_elapsedSeconds / 75) * 0.84;
+    return value.clamp(0.08, 0.92);
+  }
+
+  String _progressDetail() {
+    if (!_scanningWithAi) return '';
+    final remaining = (60 - _elapsedSeconds).clamp(0, 60);
+    if (_elapsedSeconds < 60) {
+      return '${_elapsedSeconds}s elapsed · usually ~${remaining}s remaining';
+    }
+    return '${_elapsedSeconds}s elapsed · detailed scans can take longer';
+  }
+
+  String _friendlyScanError(Object error) {
+    final message = error.toString().toLowerCase();
+    if (message.contains('failed to fetch') ||
+        message.contains('clientexception')) {
+      return 'Keepi could not reach Firebase AI Logic. '
+          'Check the Firebase AI Logic API permission for the web API key, '
+          'App Check, and your internet connection, then try again.';
+    }
+    return 'Multi-item scan failed: $error';
   }
 
   String _guessMimeType(String fileName) {
@@ -346,12 +414,29 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
           ],
           if (_busy) ...[
             const SizedBox(height: 22),
-            const LinearProgressIndicator(),
-            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: _scanningWithAi ? _estimatedProgress() : null,
+            ),
+            const SizedBox(height: 10),
             Text(
               _status ?? 'Working...',
               textAlign: TextAlign.center,
+              style: const TextStyle(fontWeight: FontWeight.w700),
             ),
+            if (_scanningWithAi) ...[
+              const SizedBox(height: 4),
+              Text(
+                _progressDetail(),
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+              const SizedBox(height: 4),
+              Text(
+                'Detected item count appears when AI finishes this pass.',
+                textAlign: TextAlign.center,
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
           ],
         ],
       ),
