@@ -3,15 +3,15 @@ import 'dart:typed_data';
 
 import 'package:image/image.dart' as img;
 
-import '../data/thing_ai_service.dart';
+import 'thing_ai_service.dart';
 import '../domain/scanned_thing_candidate.dart';
-import '../domain/thing_recognition.dart';
+import '../domain/thing_detection.dart';
 
 enum MultiScanStage {
   preparing,
-  splitting,
-  scanning,
-  merging,
+  locating,
+  cropping,
+  identifying,
   completed,
   failed,
 }
@@ -21,41 +21,45 @@ class MultiScanProgress {
     required this.stage,
     required this.message,
     required this.progress,
-    required this.totalTiles,
-    required this.completedTiles,
-    required this.currentTile,
+    required this.totalDetected,
+    required this.completedItems,
+    required this.currentItem,
     required this.items,
     required this.elapsed,
     required this.logs,
     this.estimatedRemaining,
-    this.failedTiles = 0,
+    this.failedItems = 0,
+    this.currentCropBytes,
+    this.currentHint,
     this.errorMessage,
   });
 
   final MultiScanStage stage;
   final String message;
   final double progress;
-  final int totalTiles;
-  final int completedTiles;
-  final int currentTile;
+  final int totalDetected;
+  final int completedItems;
+  final int currentItem;
   final List<ScannedThingCandidate> items;
   final Duration elapsed;
   final Duration? estimatedRemaining;
-  final int failedTiles;
+  final int failedItems;
+  final Uint8List? currentCropBytes;
+  final String? currentHint;
   final List<String> logs;
   final String? errorMessage;
 
-  int get itemCount => items.length;
+  int get identifiedCount => items.length;
 }
 
 class MultiItemScanService {
   const MultiItemScanService({
-    this.overlapRatio = 0.12,
-    this.jpegQuality = 86,
+    this.jpegQuality = 90,
+    this.cropPaddingRatio = 0.08,
   });
 
-  final double overlapRatio;
   final int jpegQuality;
+  final double cropPaddingRatio;
 
   Stream<MultiScanProgress> scan({
     required Uint8List imageBytes,
@@ -63,8 +67,9 @@ class MultiItemScanService {
     final stopwatch = Stopwatch()..start();
     final logs = <String>[];
     final candidates = <ScannedThingCandidate>[];
-    final tileDurations = <Duration>[];
-    var failedTiles = 0;
+    final recognitionDurations = <Duration>[];
+    var failedItems = 0;
+    var totalDetected = 0;
 
     void log(String line) {
       logs.add(line);
@@ -73,41 +78,43 @@ class MultiItemScanService {
       }
     }
 
-    MultiScanProgress progress({
+    MultiScanProgress buildProgress({
       required MultiScanStage stage,
       required String message,
       required double value,
-      required int totalTiles,
-      required int completedTiles,
-      required int currentTile,
+      required int completedItems,
+      required int currentItem,
       Duration? remaining,
+      Uint8List? currentCropBytes,
+      String? currentHint,
       String? error,
     }) {
       return MultiScanProgress(
         stage: stage,
         message: message,
         progress: value.clamp(0.0, 1.0).toDouble(),
-        totalTiles: totalTiles,
-        completedTiles: completedTiles,
-        currentTile: currentTile,
+        totalDetected: totalDetected,
+        completedItems: completedItems,
+        currentItem: currentItem,
         items: List<ScannedThingCandidate>.unmodifiable(candidates),
         elapsed: stopwatch.elapsed,
         estimatedRemaining: remaining,
-        failedTiles: failedTiles,
+        failedItems: failedItems,
+        currentCropBytes: currentCropBytes,
+        currentHint: currentHint,
         logs: List<String>.unmodifiable(logs),
         errorMessage: error,
       );
     }
 
     try {
-      log('Preparing image');
-      yield progress(
+      log('Preparing full image');
+      yield buildProgress(
         stage: MultiScanStage.preparing,
         message: 'Preparing image...',
-        value: 0.04,
-        totalTiles: 0,
-        completedTiles: 0,
-        currentTile: 0,
+        value: 0.03,
+        completedItems: 0,
+        currentItem: 0,
       );
 
       final decoded = img.decodeImage(imageBytes);
@@ -115,125 +122,154 @@ class MultiItemScanService {
         throw StateError('Keepi could not decode this image.');
       }
 
-      final plan = _choosePlan(decoded.width, decoded.height);
-      final tiles = _createTiles(
-        source: decoded,
-        rows: plan.rows,
-        columns: plan.columns,
+      final source = img.bakeOrientation(decoded);
+      final normalizedBytes = Uint8List.fromList(
+        img.encodeJpg(source, quality: jpegQuality),
       );
 
-      log('Created ${tiles.length} overlapping scan areas');
-      yield progress(
-        stage: MultiScanStage.splitting,
-        message: 'Found ${tiles.length} scan areas',
-        value: 0.12,
-        totalTiles: tiles.length,
-        completedTiles: 0,
-        currentTile: 0,
+      log('AI is locating separate products');
+      yield buildProgress(
+        stage: MultiScanStage.locating,
+        message: 'AI is finding separate products...',
+        value: 0.08,
+        completedItems: 0,
+        currentItem: 0,
       );
 
-      for (var i = 0; i < tiles.length; i++) {
-        final tile = tiles[i];
-        final tileNumber = i + 1;
-        final tileStopwatch = Stopwatch()..start();
+      final rawDetections = await ThingAiService.detectThings(
+        imageBytes: normalizedBytes,
+        mimeType: 'image/jpeg',
+      );
 
-        log('Scanning area $tileNumber of ${tiles.length}');
-        yield progress(
-          stage: MultiScanStage.scanning,
-          message: 'Scanning area $tileNumber of ${tiles.length}',
-          value: _scanProgress(i, tiles.length),
-          totalTiles: tiles.length,
-          completedTiles: i,
-          currentTile: tileNumber,
-          remaining: _estimateRemaining(
-            tileDurations,
-            tiles.length - i,
-          ),
+      final detections = _prepareDetections(rawDetections);
+      totalDetected = detections.length;
+
+      if (detections.isEmpty) {
+        throw StateError(
+          'Keepi could not find separate products in this image.',
+        );
+      }
+
+      log('AI found $totalDetected separate products');
+      yield buildProgress(
+        stage: MultiScanStage.cropping,
+        message: 'Found $totalDetected products · creating individual crops...',
+        value: 0.16,
+        completedItems: 0,
+        currentItem: 0,
+      );
+
+      final crops = <_DetectedCrop>[];
+      for (var i = 0; i < detections.length; i++) {
+        final detection = detections[i];
+        final crop = _cropDetection(
+          source: source,
+          detection: detection,
+          itemIndex: i + 1,
+          totalItems: detections.length,
+        );
+        crops.add(crop);
+      }
+
+      log('Created ${crops.length} product images');
+      yield buildProgress(
+        stage: MultiScanStage.cropping,
+        message: 'Created ${crops.length} individual product images',
+        value: 0.20,
+        completedItems: 0,
+        currentItem: 0,
+      );
+
+      for (var i = 0; i < crops.length; i++) {
+        final crop = crops[i];
+        final itemNumber = i + 1;
+        final itemStopwatch = Stopwatch()..start();
+
+        log(
+          'Identifying product $itemNumber/$totalDetected'
+          '${crop.detection.hint.isEmpty ? '' : ' · ${crop.detection.hint}'}',
         );
 
-        final tileBytes = Uint8List.fromList(
-          img.encodeJpg(tile, quality: jpegQuality),
+        yield buildProgress(
+          stage: MultiScanStage.identifying,
+          message: 'Identifying product $itemNumber of $totalDetected',
+          value: _identificationProgress(i, totalDetected),
+          completedItems: i,
+          currentItem: itemNumber,
+          remaining: _estimateRemaining(
+            recognitionDurations,
+            totalDetected - i,
+          ),
+          currentCropBytes: crop.bytes,
+          currentHint: crop.detection.hint,
         );
 
         try {
-          final recognized = await ThingAiService.recognizeMultipleTile(
-            imageBytes: tileBytes,
-            tileIndex: tileNumber,
-            totalTiles: tiles.length,
+          final recognition = await ThingAiService.recognizeDetectedThing(
+            imageBytes: crop.bytes,
+            hint: crop.detection.hint,
+            itemIndex: itemNumber,
+            totalItems: totalDetected,
           );
 
-          final incoming = recognized
-              .map(
-                (recognition) => ScannedThingCandidate(
-                  recognition: recognition,
-                  tileBytes: tileBytes,
-                  tileIndex: tileNumber,
-                  totalTiles: tiles.length,
-                ),
-              )
-              .toList();
-
-          final before = candidates.length;
-          _mergeCandidates(candidates, incoming);
-          final added = candidates.length - before;
+          candidates.add(
+            ScannedThingCandidate(
+              recognition: recognition,
+              cropBytes: crop.bytes,
+              itemIndex: itemNumber,
+              totalItems: totalDetected,
+            ),
+          );
 
           log(
-            'Area $tileNumber complete: '
-            '${recognized.length} detected, $added new',
+            'Product $itemNumber identified: '
+            '${recognition.name.isEmpty ? crop.detection.hint : recognition.name}',
           );
-        } catch (error) {
-          failedTiles++;
-          log('Area $tileNumber failed; continuing');
+        } catch (_) {
+          failedItems++;
+          log('Product $itemNumber could not be identified; continuing');
         } finally {
-          tileStopwatch.stop();
-          tileDurations.add(tileStopwatch.elapsed);
+          itemStopwatch.stop();
+          recognitionDurations.add(itemStopwatch.elapsed);
         }
 
-        yield progress(
-          stage: MultiScanStage.scanning,
+        yield buildProgress(
+          stage: MultiScanStage.identifying,
           message:
-              'Area $tileNumber complete · ${candidates.length} items found',
-          value: _scanProgress(tileNumber, tiles.length),
-          totalTiles: tiles.length,
-          completedTiles: tileNumber,
-          currentTile: tileNumber,
+              '$itemNumber of $totalDetected processed · '
+              '${candidates.length} identified',
+          value: _identificationProgress(itemNumber, totalDetected),
+          completedItems: itemNumber,
+          currentItem: itemNumber,
           remaining: _estimateRemaining(
-            tileDurations,
-            tiles.length - tileNumber,
+            recognitionDurations,
+            totalDetected - itemNumber,
           ),
+          currentCropBytes: crop.bytes,
+          currentHint: crop.detection.hint,
         );
       }
 
-      if (failedTiles == tiles.length) {
+      if (candidates.isEmpty) {
         throw StateError(
-          'All scan areas failed to reach Keepi AI. Please try again.',
+          'Keepi found $totalDetected products but could not identify any of them.',
         );
       }
-
-      log('Merging overlapping results');
-      yield progress(
-        stage: MultiScanStage.merging,
-        message: 'Removing duplicates...',
-        value: 0.96,
-        totalTiles: tiles.length,
-        completedTiles: tiles.length,
-        currentTile: tiles.length,
-      );
 
       stopwatch.stop();
-      log('Scan complete: ${candidates.length} unique items');
+      log('Scan complete: ${candidates.length} products identified');
 
       yield MultiScanProgress(
         stage: MultiScanStage.completed,
-        message: 'Found ${candidates.length} Things',
+        message: 'Identified ${candidates.length} of $totalDetected products',
         progress: 1,
-        totalTiles: tiles.length,
-        completedTiles: tiles.length,
-        currentTile: tiles.length,
+        totalDetected: totalDetected,
+        completedItems: totalDetected,
+        currentItem: totalDetected,
         items: List<ScannedThingCandidate>.unmodifiable(candidates),
         elapsed: stopwatch.elapsed,
         estimatedRemaining: Duration.zero,
-        failedTiles: failedTiles,
+        failedItems: failedItems,
         logs: List<String>.unmodifiable(logs),
       );
     } catch (error) {
@@ -244,83 +280,114 @@ class MultiItemScanService {
         stage: MultiScanStage.failed,
         message: 'Scan failed',
         progress: 1,
-        totalTiles: 0,
-        completedTiles: 0,
-        currentTile: 0,
+        totalDetected: totalDetected,
+        completedItems: 0,
+        currentItem: 0,
         items: List<ScannedThingCandidate>.unmodifiable(candidates),
         elapsed: stopwatch.elapsed,
-        failedTiles: failedTiles,
+        failedItems: failedItems,
         logs: List<String>.unmodifiable(logs),
         errorMessage: error.toString(),
       );
     }
   }
 
-  _GridPlan _choosePlan(int width, int height) {
-    final ratio = width / height;
+  List<ThingDetection> _prepareDetections(
+    List<ThingDetection> rawDetections,
+  ) {
+    final sorted = rawDetections
+        .where((detection) => detection.hasValidBox)
+        .toList()
+      ..sort((a, b) {
+        final yCompare = a.yMin.compareTo(b.yMin);
+        if ((a.yMin - b.yMin).abs() < 40) {
+          return a.xMin.compareTo(b.xMin);
+        }
+        return yCompare;
+      });
 
-    if (ratio >= 1.28) {
-      return const _GridPlan(rows: 3, columns: 2);
-    }
+    final result = <ThingDetection>[];
 
-    if (ratio <= 0.78) {
-      return const _GridPlan(rows: 2, columns: 3);
-    }
+    for (final detection in sorted) {
+      final duplicateIndex = result.indexWhere(
+        (existing) => _intersectionOverUnion(existing, detection) >= 0.72,
+      );
 
-    return const _GridPlan(rows: 3, columns: 3);
-  }
-
-  List<img.Image> _createTiles({
-    required img.Image source,
-    required int rows,
-    required int columns,
-  }) {
-    final cellWidth = source.width / columns;
-    final cellHeight = source.height / rows;
-    final overlapX = (cellWidth * overlapRatio).round();
-    final overlapY = (cellHeight * overlapRatio).round();
-
-    final tiles = <img.Image>[];
-
-    for (var row = 0; row < rows; row++) {
-      for (var column = 0; column < columns; column++) {
-        final rawLeft = (column * cellWidth).floor();
-        final rawTop = (row * cellHeight).floor();
-        final rawRight = ((column + 1) * cellWidth).ceil();
-        final rawBottom = ((row + 1) * cellHeight).ceil();
-
-        final left = math.max(0, rawLeft - overlapX);
-        final top = math.max(0, rawTop - overlapY);
-        final right = math.min(source.width, rawRight + overlapX);
-        final bottom = math.min(source.height, rawBottom + overlapY);
-
-        tiles.add(
-          img.copyCrop(
-            source,
-            x: left,
-            y: top,
-            width: math.max(1, right - left),
-            height: math.max(1, bottom - top),
-          ),
-        );
+      if (duplicateIndex == -1) {
+        result.add(detection);
+      } else if (detection.confidence > result[duplicateIndex].confidence) {
+        result[duplicateIndex] = detection;
       }
     }
 
-    return tiles;
+    return result.take(60).toList();
   }
 
-  double _scanProgress(int completedTiles, int totalTiles) {
-    const start = 0.15;
+  _DetectedCrop _cropDetection({
+    required img.Image source,
+    required ThingDetection detection,
+    required int itemIndex,
+    required int totalItems,
+  }) {
+    int xFromNormalized(int value) =>
+        ((value / 1000) * source.width).round();
+
+    int yFromNormalized(int value) =>
+        ((value / 1000) * source.height).round();
+
+    final rawLeft = xFromNormalized(detection.xMin);
+    final rawTop = yFromNormalized(detection.yMin);
+    final rawRight = xFromNormalized(detection.xMax);
+    final rawBottom = yFromNormalized(detection.yMax);
+
+    final rawWidth = math.max(1, rawRight - rawLeft);
+    final rawHeight = math.max(1, rawBottom - rawTop);
+
+    final padX = math.max(10, (rawWidth * cropPaddingRatio).round());
+    final padY = math.max(8, (rawHeight * cropPaddingRatio).round());
+
+    final left = math.max(0, rawLeft - padX);
+    final top = math.max(0, rawTop - padY);
+    final right = math.min(source.width, rawRight + padX);
+    final bottom = math.min(source.height, rawBottom + padY);
+
+    final cropped = img.copyCrop(
+      source,
+      x: left,
+      y: top,
+      width: math.max(1, right - left),
+      height: math.max(1, bottom - top),
+    );
+
+    return _DetectedCrop(
+      detection: detection,
+      bytes: Uint8List.fromList(
+        img.encodeJpg(cropped, quality: jpegQuality),
+      ),
+      itemIndex: itemIndex,
+      totalItems: totalItems,
+    );
+  }
+
+  double _identificationProgress(
+    int completedItems,
+    int totalItems,
+  ) {
+    const start = 0.20;
     const span = 0.78;
-    if (totalTiles <= 0) return start;
-    return start + (completedTiles / totalTiles) * span;
+
+    if (totalItems <= 0) {
+      return start;
+    }
+
+    return start + (completedItems / totalItems) * span;
   }
 
   Duration? _estimateRemaining(
     List<Duration> completedDurations,
-    int tilesRemaining,
+    int itemsRemaining,
   ) {
-    if (completedDurations.isEmpty || tilesRemaining <= 0) {
+    if (completedDurations.isEmpty || itemsRemaining <= 0) {
       return null;
     }
 
@@ -329,84 +396,50 @@ class MultiItemScanService {
       (sum, duration) => sum + duration.inMilliseconds,
     );
 
-    final average = totalMilliseconds / completedDurations.length;
+    final averageMilliseconds =
+        totalMilliseconds / completedDurations.length;
+
     return Duration(
-      milliseconds: (average * tilesRemaining).round(),
+      milliseconds: (averageMilliseconds * itemsRemaining).round(),
     );
   }
 
-  void _mergeCandidates(
-    List<ScannedThingCandidate> existing,
-    List<ScannedThingCandidate> incoming,
+  double _intersectionOverUnion(
+    ThingDetection a,
+    ThingDetection b,
   ) {
-    for (final candidate in incoming) {
-      final duplicateIndex = existing.indexWhere(
-        (current) => _sameThing(
-          current.recognition,
-          candidate.recognition,
-        ),
-      );
+    final left = math.max(a.xMin, b.xMin);
+    final top = math.max(a.yMin, b.yMin);
+    final right = math.min(a.xMax, b.xMax);
+    final bottom = math.min(a.yMax, b.yMax);
 
-      if (duplicateIndex == -1) {
-        existing.add(candidate);
-        continue;
-      }
-
-      if (candidate.recognition.confidence >
-          existing[duplicateIndex].recognition.confidence) {
-        existing[duplicateIndex] = candidate;
-      }
-    }
-  }
-
-  bool _sameThing(
-    ThingRecognition a,
-    ThingRecognition b,
-  ) {
-    if (a.categoryId != b.categoryId) {
-      return false;
+    if (right <= left || bottom <= top) {
+      return 0;
     }
 
-    final aName = _normalize(a.name);
-    final bName = _normalize(b.name);
+    final intersection = (right - left) * (bottom - top);
+    final areaA = (a.xMax - a.xMin) * (a.yMax - a.yMin);
+    final areaB = (b.xMax - b.xMin) * (b.yMax - b.yMin);
+    final union = areaA + areaB - intersection;
 
-    if (aName.isEmpty || bName.isEmpty) {
-      return false;
+    if (union <= 0) {
+      return 0;
     }
 
-    if (aName == bName) {
-      return true;
-    }
-
-    final aTokens = aName.split(' ').where((value) => value.length > 1).toSet();
-    final bTokens = bName.split(' ').where((value) => value.length > 1).toSet();
-
-    if (aTokens.isEmpty || bTokens.isEmpty) {
-      return false;
-    }
-
-    final intersection = aTokens.intersection(bTokens).length;
-    final union = aTokens.union(bTokens).length;
-    final similarity = union == 0 ? 0.0 : intersection / union;
-
-    return similarity >= 0.8;
-  }
-
-  String _normalize(String value) {
-    return value
-        .toLowerCase()
-        .replaceAll(RegExp(r'[^a-z0-9א-ת]+'), ' ')
-        .trim()
-        .replaceAll(RegExp(r'\s+'), ' ');
+    return intersection / union;
   }
 }
 
-class _GridPlan {
-  const _GridPlan({
-    required this.rows,
-    required this.columns,
+class _DetectedCrop {
+  const _DetectedCrop({
+    required this.detection,
+    required this.bytes,
+    required this.itemIndex,
+    required this.totalItems,
   });
 
-  final int rows;
-  final int columns;
+  final ThingDetection detection;
+  final Uint8List bytes;
+  final int itemIndex;
+  final int totalItems;
 }
