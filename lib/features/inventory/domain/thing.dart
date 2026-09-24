@@ -17,10 +17,12 @@ enum ThingCondition {
 }
 
 enum ThingAction {
+  personalUse,
   sell,
   rent,
   borrow,
   give,
+  exchange,
 }
 
 class Thing {
