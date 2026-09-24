@@ -86,7 +86,7 @@ class MultiItemScanService {
       return MultiScanProgress(
         stage: stage,
         message: message,
-        progress: value.clamp(0.0, 1.0),
+        progress: value.clamp(0.0, 1.0).toDouble(),
         totalTiles: totalTiles,
         completedTiles: completedTiles,
         currentTile: currentTile,
