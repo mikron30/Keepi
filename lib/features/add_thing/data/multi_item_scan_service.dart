@@ -270,9 +270,19 @@ class MultiItemScanService {
             'Product $itemNumber identified: '
             '${recognition.name.isEmpty ? crop.detection.hint : recognition.name}',
           );
-        } catch (_) {
+        } catch (error) {
           failedItems++;
-          log('Product $itemNumber could not be identified; continuing');
+          final compactError = error
+              .toString()
+              .replaceAll(RegExp(r'\s+'), ' ')
+              .trim();
+          final shortError = compactError.length > 110
+              ? '${compactError.substring(0, 110)}…'
+              : compactError;
+          log(
+            'Product $itemNumber failed: '
+            '${shortError.isEmpty ? 'unknown AI error' : shortError}',
+          );
         } finally {
           itemStopwatch.stop();
           recognitionDurations.add(itemStopwatch.elapsed);
