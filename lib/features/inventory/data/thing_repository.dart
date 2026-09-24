@@ -288,11 +288,11 @@ class ThingRepository {
           estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
           enabledActions: const {ThingAction.personalUse},
           photoUrls: [
-            if (tileUrl != null) tileUrl,
+            ?tileUrl,
             sourceUrl,
           ],
           photoStoragePaths: [
-            if (tilePath != null) tilePath,
+            ?tilePath,
             sourceRef.fullPath,
           ],
           location: location,
