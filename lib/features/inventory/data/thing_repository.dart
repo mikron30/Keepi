@@ -105,6 +105,7 @@ class ThingRepository {
             enabledActions: enabledActions,
             photoUrls: [downloadUrl],
             photoStoragePaths: [storageRef.fullPath],
+            thumbnailUrl: downloadUrl,
             location: location,
           ),
         )
@@ -178,6 +179,7 @@ class ThingRepository {
           enabledActions: const {ThingAction.personalUse},
           photoUrls: [downloadUrl],
           photoStoragePaths: [storageRef.fullPath],
+          thumbnailUrl: downloadUrl,
           location: location,
           scanId: scanId,
         ),
@@ -290,6 +292,7 @@ class ThingRepository {
             ?cropPath,
             sourceRef.fullPath,
           ],
+          thumbnailUrl: cropUrl ?? sourceUrl,
           location: location,
           scanId: scanId,
         ),
@@ -457,6 +460,7 @@ class ThingRepository {
     required Set<ThingAction> enabledActions,
     required List<String> photoUrls,
     required List<String> photoStoragePaths,
+    String? thumbnailUrl,
     required Map<String, double>? location,
     String? scanId,
   }) {
@@ -482,6 +486,7 @@ class ThingRepository {
       'description': description.trim(),
       'photoUrls': photoUrls,
       'photoStoragePaths': photoStoragePaths,
+      'thumbnailUrl': thumbnailUrl ?? (photoUrls.isEmpty ? null : photoUrls.first),
       'attributes': attributes,
       'searchKeywords': {
         ...recognition.searchKeywords.map((value) => value.toLowerCase()),
