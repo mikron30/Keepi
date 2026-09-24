@@ -173,6 +173,9 @@ class _ThingCard extends StatelessWidget {
     final model = thing.attributes['model']?.toString().trim() ?? '';
     final confidence = thing.attributes['aiConfidence'];
     final value = thing.estimatedCurrentValue;
+    final thumbnailUrl = thing.thumbnailUrl?.trim().isNotEmpty == true
+        ? thing.thumbnailUrl!.trim()
+        : (thing.photoUrls.isEmpty ? null : thing.photoUrls.first);
 
     return Card(
       child: Padding(
@@ -185,13 +188,13 @@ class _ThingCard extends StatelessWidget {
               child: SizedBox(
                 width: 92,
                 height: 92,
-                child: thing.photoUrls.isEmpty
+                child: thumbnailUrl == null
                     ? const ColoredBox(
                         color: Colors.black12,
                         child: Icon(Icons.inventory_2_outlined, size: 34),
                       )
                     : Image.network(
-                        thing.photoUrls.first,
+                        thumbnailUrl,
                         fit: BoxFit.cover,
                         webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
                         loadingBuilder: (context, child, progress) {
@@ -215,7 +218,7 @@ class _ThingCard extends StatelessWidget {
                         errorBuilder: (_, error, _) {
                           debugPrint(
                             'Keepi thumbnail failed for '
-                            '${thing.photoUrls.first}: $error',
+                            '$thumbnailUrl: $error',
                           );
 
                           return const ColoredBox(
