@@ -54,6 +54,7 @@ class ThingRepository {
     required String description,
     required int estimatedNewPriceIls,
     required int estimatedCurrentValueIls,
+    required Set<ThingAction> enabledActions,
   }) async {
     final user = _auth.currentUser;
     if (user == null) {
@@ -113,8 +114,12 @@ class ThingRepository {
       }.toList(),
       'quantity': 1,
       'condition': _normalizeCondition(condition),
-      'visibility': 'private',
-      'enabledActions': <String>[],
+      'visibility': enabledActions.any(
+        (action) => action != ThingAction.personalUse,
+      )
+          ? 'public'
+          : 'private',
+      'enabledActions': enabledActions.map((action) => action.name).toList(),
       'estimatedNewPrice': estimatedNewPriceIls > 0
           ? estimatedNewPriceIls.toDouble()
           : null,
