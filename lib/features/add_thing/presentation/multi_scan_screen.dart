@@ -33,6 +33,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
   Timer? _ticker;
   DateTime? _scanStartedAt;
   int _liveElapsedSeconds = 0;
+  double? _saveProgress;
+  int _saveCompleted = 0;
+  int _saveTotal = 0;
 
   @override
   void dispose() {
@@ -167,7 +170,10 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
 
     setState(() {
       _busy = true;
-      _status = 'Adding ${selected.length} Things to My Things...';
+      _status = 'Preparing ${selected.length} Things for upload...';
+      _saveCompleted = 0;
+      _saveTotal = selected.length + 1;
+      _saveProgress = 0;
     });
 
     try {
@@ -175,6 +181,15 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
         sourceImageBytes: bytes,
         sourceMimeType: _mimeType,
         candidates: selected,
+        onProgress: (completed, total, stage) {
+          if (!mounted) return;
+          setState(() {
+            _saveCompleted = completed;
+            _saveTotal = total;
+            _saveProgress = total <= 0 ? null : completed / total;
+            _status = stage;
+          });
+        },
       );
 
       if (!mounted) {
@@ -190,6 +205,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
         setState(() {
           _busy = false;
           _status = null;
+          _saveProgress = null;
+          _saveCompleted = 0;
+          _saveTotal = 0;
         });
       }
     }
@@ -348,6 +366,36 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
               _status ?? 'Working...',
               textAlign: TextAlign.center,
               style: const TextStyle(fontWeight: FontWeight.w700),
+            ),
+          ],
+          if (_saveProgress != null) ...[
+            const SizedBox(height: 18),
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _status ?? 'Saving Things...',
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
+                    const SizedBox(height: 12),
+                    LinearProgressIndicator(
+                      value: _saveProgress,
+                      minHeight: 8,
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      '$_saveCompleted/$_saveTotal uploads completed',
+                      style: Theme.of(context).textTheme.bodySmall,
+                    ),
+                  ],
+                ),
+              ),
             ),
           ],
           if (_drafts.isNotEmpty) ...[
