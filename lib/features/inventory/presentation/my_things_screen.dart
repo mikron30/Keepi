@@ -108,10 +108,36 @@ class _ThingCard extends StatelessWidget {
                     : Image.network(
                         thing.photoUrls.first,
                         fit: BoxFit.cover,
-                        errorBuilder: (_, _, _) => const ColoredBox(
-                          color: Colors.black12,
-                          child: Icon(Icons.broken_image_outlined),
-                        ),
+                        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
+                        loadingBuilder: (context, child, progress) {
+                          if (progress == null) {
+                            return child;
+                          }
+
+                          return const ColoredBox(
+                            color: Colors.black12,
+                            child: Center(
+                              child: SizedBox(
+                                width: 22,
+                                height: 22,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                ),
+                              ),
+                            ),
+                          );
+                        },
+                        errorBuilder: (_, error, _) {
+                          debugPrint(
+                            'Keepi thumbnail failed for '
+                            '${thing.photoUrls.first}: $error',
+                          );
+
+                          return const ColoredBox(
+                            color: Colors.black12,
+                            child: Icon(Icons.broken_image_outlined),
+                          );
+                        },
                       ),
               ),
             ),
