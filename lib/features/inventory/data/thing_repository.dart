@@ -1,9 +1,11 @@
 import 'dart:async';
+import 'dart:math' as math;
 import 'dart:typed_data';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:image/image.dart' as img;
 
 import '../../add_thing/domain/scanned_thing_candidate.dart';
 import '../../add_thing/domain/thing_recognition.dart';
@@ -203,8 +205,14 @@ class ThingRepository {
       }
     }
 
+    onProgress?.call(
+      totalUploads,
+      totalUploads,
+      'Saving inventory records...',
+    );
+
     await batch.commit().timeout(
-      const Duration(seconds: 30),
+      const Duration(seconds: 60),
       onTimeout: () {
         throw TimeoutException(
           'Batch save timed out. Check Firestore setup and rules.',
@@ -219,6 +227,7 @@ class ThingRepository {
     required Uint8List sourceImageBytes,
     required String sourceMimeType,
     required List<ScannedThingCandidate> candidates,
+    void Function(int completed, int total, String stage)? onProgress,
   }) async {
     if (candidates.isEmpty) {
       return 0;
@@ -227,35 +236,73 @@ class ThingRepository {
     final user = _requireUser();
     final selected = candidates.take(60).toList();
     final scanId = _firestore.collection('scan_ids').doc().id;
-    final sourceExtension = _extensionForMimeType(sourceMimeType);
+    final preparedSource = _prepareSourceForStorage(sourceImageBytes);
     final sourceRef = _storage.ref().child(
-          'users/${user.uid}/scans/$scanId/source.$sourceExtension',
+          'users/${user.uid}/scans/$scanId/source.jpg',
         );
 
-    await _uploadBytes(
-      storageRef: sourceRef,
-      imageBytes: sourceImageBytes,
-      mimeType: sourceMimeType,
+    final totalUploads = selected.length + 1;
+    var completedUploads = 0;
+    onProgress?.call(
+      completedUploads,
+      totalUploads,
+      'Uploading source image...',
     );
 
-    final sourceUrl = await _downloadUrl(sourceRef);
+    await _uploadBytesWithRetry(
+      storageRef: sourceRef,
+      imageBytes: preparedSource,
+      mimeType: 'image/jpeg',
+    );
+
+    final sourceUrl = await _downloadUrlWithRetry(sourceRef);
+    completedUploads++;
+    onProgress?.call(
+      completedUploads,
+      totalUploads,
+      'Source uploaded',
+    );
 
     final cropUrls = <int, String>{};
     final cropPaths = <int, String>{};
 
-    for (final candidate in selected) {
-      final cropRef = _storage.ref().child(
-            'users/${user.uid}/scans/$scanId/crop_${candidate.itemIndex}.jpg',
+    const parallelUploads = 4;
+    for (var start = 0; start < selected.length; start += parallelUploads) {
+      final end = math.min(start + parallelUploads, selected.length);
+      final group = selected.sublist(start, end);
+
+      final results = await Future.wait(
+        group.map((candidate) async {
+          final cropRef = _storage.ref().child(
+                'users/${user.uid}/scans/$scanId/crop_${candidate.itemIndex}.jpg',
+              );
+
+          await _uploadBytesWithRetry(
+            storageRef: cropRef,
+            imageBytes: candidate.cropBytes,
+            mimeType: 'image/jpeg',
           );
 
-      await _uploadBytes(
-        storageRef: cropRef,
-        imageBytes: candidate.cropBytes,
-        mimeType: 'image/jpeg',
+          final url = await _downloadUrlWithRetry(cropRef);
+          return (
+            itemIndex: candidate.itemIndex,
+            url: url,
+            path: cropRef.fullPath,
+          );
+        }),
       );
 
-      cropUrls[candidate.itemIndex] = await _downloadUrl(cropRef);
-      cropPaths[candidate.itemIndex] = cropRef.fullPath;
+      for (final result in results) {
+        cropUrls[result.itemIndex] = result.url;
+        cropPaths[result.itemIndex] = result.path;
+        completedUploads++;
+      }
+
+      onProgress?.call(
+        completedUploads,
+        totalUploads,
+        'Uploaded ${completedUploads - 1}/${selected.length} product images',
+      );
     }
 
     final location = await _defaultThingLocation(user.uid);
@@ -323,6 +370,12 @@ class ThingRepository {
           'Batch save timed out. Check Firestore setup and rules.',
         );
       },
+    );
+
+    onProgress?.call(
+      totalUploads,
+      totalUploads,
+      'Saved ${selected.length} Things',
     );
 
     return selected.length;
@@ -575,34 +628,112 @@ class ThingRepository {
     return user;
   }
 
+  Uint8List _prepareSourceForStorage(Uint8List bytes) {
+    try {
+      final decoded = img.decodeImage(bytes);
+      if (decoded == null) {
+        return bytes;
+      }
+
+      var image = img.bakeOrientation(decoded);
+      const maxSide = 2200;
+      final longestSide = math.max(image.width, image.height);
+
+      if (longestSide > maxSide) {
+        final scale = maxSide / longestSide;
+        image = img.copyResize(
+          image,
+          width: math.max(1, (image.width * scale).round()),
+          height: math.max(1, (image.height * scale).round()),
+        );
+      }
+
+      return Uint8List.fromList(
+        img.encodeJpg(image, quality: 84),
+      );
+    } catch (_) {
+      return bytes;
+    }
+  }
+
   Future<void> _uploadBytes({
     required Reference storageRef,
     required Uint8List imageBytes,
     required String mimeType,
   }) async {
-    await storageRef
-        .putData(
-          imageBytes,
-          SettableMetadata(contentType: mimeType),
-        )
-        .timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            throw TimeoutException(
-              'Photo upload timed out. Check Firebase Storage setup and rules.',
-            );
-          },
-        );
+    await _uploadBytesWithRetry(
+      storageRef: storageRef,
+      imageBytes: imageBytes,
+      mimeType: mimeType,
+    );
+  }
+
+  Future<void> _uploadBytesWithRetry({
+    required Reference storageRef,
+    required Uint8List imageBytes,
+    required String mimeType,
+    int maxAttempts = 3,
+  }) async {
+    Object? lastError;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        await storageRef
+            .putData(
+              imageBytes,
+              SettableMetadata(
+                contentType: mimeType,
+                cacheControl: 'public,max-age=31536000',
+              ),
+            )
+            .timeout(const Duration(seconds: 90));
+        return;
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxAttempts) {
+          await Future<void>.delayed(
+            Duration(seconds: attempt * 2),
+          );
+        }
+      }
+    }
+
+    throw StateError(
+      'Photo upload failed after $maxAttempts attempts '
+      '(${storageRef.fullPath}). Last error: $lastError',
+    );
   }
 
   Future<String> _downloadUrl(Reference storageRef) {
-    return storageRef.getDownloadURL().timeout(
-      const Duration(seconds: 15),
-      onTimeout: () {
-        throw TimeoutException(
-          'Could not get the uploaded photo URL from Firebase Storage.',
-        );
-      },
+    return _downloadUrlWithRetry(storageRef);
+  }
+
+  Future<String> _downloadUrlWithRetry(
+    Reference storageRef, {
+    int maxAttempts = 3,
+  }) async {
+    Object? lastError;
+
+    for (var attempt = 1; attempt <= maxAttempts; attempt++) {
+      try {
+        return await storageRef
+            .getDownloadURL()
+            .timeout(const Duration(seconds: 30));
+      } catch (error) {
+        lastError = error;
+
+        if (attempt < maxAttempts) {
+          await Future<void>.delayed(
+            Duration(seconds: attempt * 2),
+          );
+        }
+      }
+    }
+
+    throw StateError(
+      'Could not get photo URL after $maxAttempts attempts '
+      '(${storageRef.fullPath}). Last error: $lastError',
     );
   }
 
