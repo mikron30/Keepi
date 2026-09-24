@@ -165,8 +165,6 @@ class MultiItemScanService {
         final crop = _cropDetection(
           source: source,
           detection: detection,
-          itemIndex: i + 1,
-          totalItems: detections.length,
         );
         crops.add(crop);
       }
@@ -326,8 +324,6 @@ class MultiItemScanService {
   _DetectedCrop _cropDetection({
     required img.Image source,
     required ThingDetection detection,
-    required int itemIndex,
-    required int totalItems,
   }) {
     int xFromNormalized(int value) =>
         ((value / 1000) * source.width).round();
@@ -364,8 +360,6 @@ class MultiItemScanService {
       bytes: Uint8List.fromList(
         img.encodeJpg(cropped, quality: jpegQuality),
       ),
-      itemIndex: itemIndex,
-      totalItems: totalItems,
     );
   }
 
@@ -434,12 +428,8 @@ class _DetectedCrop {
   const _DetectedCrop({
     required this.detection,
     required this.bytes,
-    required this.itemIndex,
-    required this.totalItems,
   });
 
   final ThingDetection detection;
   final Uint8List bytes;
-  final int itemIndex;
-  final int totalItems;
 }
