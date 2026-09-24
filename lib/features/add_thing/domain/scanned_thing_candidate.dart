@@ -5,27 +5,27 @@ import 'thing_recognition.dart';
 class ScannedThingCandidate {
   const ScannedThingCandidate({
     required this.recognition,
-    required this.tileBytes,
-    required this.tileIndex,
-    required this.totalTiles,
+    required this.cropBytes,
+    required this.itemIndex,
+    required this.totalItems,
   });
 
   final ThingRecognition recognition;
-  final Uint8List tileBytes;
-  final int tileIndex;
-  final int totalTiles;
+  final Uint8List cropBytes;
+  final int itemIndex;
+  final int totalItems;
 
   ScannedThingCandidate copyWith({
     ThingRecognition? recognition,
-    Uint8List? tileBytes,
-    int? tileIndex,
-    int? totalTiles,
+    Uint8List? cropBytes,
+    int? itemIndex,
+    int? totalItems,
   }) {
     return ScannedThingCandidate(
       recognition: recognition ?? this.recognition,
-      tileBytes: tileBytes ?? this.tileBytes,
-      tileIndex: tileIndex ?? this.tileIndex,
-      totalTiles: totalTiles ?? this.totalTiles,
+      cropBytes: cropBytes ?? this.cropBytes,
+      itemIndex: itemIndex ?? this.itemIndex,
+      totalItems: totalItems ?? this.totalItems,
     );
   }
 }
