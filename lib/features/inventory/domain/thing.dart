@@ -29,7 +29,7 @@ class Thing {
   const Thing({
     required this.id,
     required this.ownerId,
-    required this.ownerDisplayName,
+    this.ownerDisplayName = 'Keepi user',
     required this.name,
     required this.categoryId,
     required this.createdAt,
