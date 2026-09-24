@@ -59,8 +59,8 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     try {
       final image = await _picker.pickImage(
         source: source,
-        imageQuality: 90,
-        maxWidth: 2200,
+        imageQuality: 92,
+        maxWidth: 3000,
       );
 
       if (image == null) {
@@ -121,18 +121,18 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
 
       setState(() {
         _drafts = candidates.map(_DetectedThingDraft.new).toList();
-        _status = 'Found ${candidates.length} Things.';
+        _status = 'Identified ${candidates.length} Things.';
       });
 
       if (_drafts.isEmpty) {
         _showMessage(
-          'Keepi could not confidently identify separate items. '
+          'Keepi could not confidently identify any of the detected products. '
           'Try a closer, sharper photo.',
         );
-      } else if (finalProgress.failedTiles > 0) {
+      } else if (finalProgress.failedItems > 0) {
         _showMessage(
-          'Found ${candidates.length} Things. '
-          '${finalProgress.failedTiles} scan area(s) could not be read.',
+          'Identified ${candidates.length} of '
+          '${finalProgress.totalDetected} detected products.',
         );
       }
     } catch (error) {
@@ -228,11 +228,11 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     final lower = message.toLowerCase();
 
     if (lower.contains('failed to fetch') ||
-        lower.contains('clientexception') ||
-        lower.contains('all scan areas failed')) {
-      return 'Keepi could not complete the AI scan. '
-          'The image was split into smaller areas, but the AI connection '
-          'failed. Check your connection and try again.';
+        lower.contains('clientexception')) {
+      return 'Keepi could not complete the AI scan because the AI connection '
+          'failed. Your photo was not split into arbitrary areas; Keepi first '
+          'asks AI to locate each product, then crops and identifies them one '
+          'by one. Check the connection and try again.';
     }
 
     return 'Multi-item scan failed: $message';
@@ -285,9 +285,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
           ),
           const SizedBox(height: 8),
           const Text(
-            'Great for bookshelves, shoes, tool racks, cupboards, closets '
-            'and rooms. Keepi splits the photo into smaller scan areas and '
-            'identifies them one by one.',
+            'Keepi first uses AI to locate every separate product in the full '
+            'photo. It then crops each product and identifies the crops one by '
+            'one — ideal for books, shoes, tools and other collections.',
           ),
           const SizedBox(height: 18),
           if (_imageBytes != null) ...[
@@ -317,7 +317,7 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
               onPressed:
                   _busy ? null : () => _pickAndScan(ImageSource.camera),
               icon: const Icon(Icons.camera_alt_outlined),
-              label: const Text('Photograph shelf / room'),
+              label: const Text('Photograph collection'),
               style: FilledButton.styleFrom(
                 minimumSize: const Size.fromHeight(56),
               ),
@@ -356,7 +356,7 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
               children: [
                 Expanded(
                   child: Text(
-                    '${_drafts.length} detected · $selectedCount selected',
+                    '${_drafts.length} identified · $selectedCount selected',
                     style: Theme.of(context).textTheme.titleMedium?.copyWith(
                           fontWeight: FontWeight.w800,
                         ),
@@ -401,9 +401,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                         ClipRRect(
                           borderRadius: BorderRadius.circular(10),
                           child: Image.memory(
-                            draft.candidate.tileBytes,
-                            width: 58,
-                            height: 58,
+                            draft.candidate.cropBytes,
+                            width: 62,
+                            height: 62,
                             fit: BoxFit.cover,
                           ),
                         ),
@@ -430,7 +430,7 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                                       .isNotEmpty)
                                     draft.candidate.recognition.subcategory,
                                   'AI ${draft.candidate.recognition.confidence}%',
-                                  'Area ${draft.candidate.tileIndex}',
+                                  'Product ${draft.candidate.itemIndex}',
                                 ].join(' · '),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
@@ -520,42 +520,71 @@ class _ScanProgressCard extends StatelessWidget {
               minHeight: 8,
               borderRadius: BorderRadius.circular(20),
             ),
+            if (progress.currentCropBytes != null &&
+                progress.stage == MultiScanStage.identifying) ...[
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.memory(
+                      progress.currentCropBytes!,
+                      width: 66,
+                      height: 66,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      progress.currentHint?.isNotEmpty == true
+                          ? 'Current product: ${progress.currentHint}'
+                          : 'Identifying current product...',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                            fontWeight: FontWeight.w700,
+                          ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
             const SizedBox(height: 14),
             Wrap(
               spacing: 8,
               runSpacing: 8,
               children: [
                 _ProgressChip(
-                  icon: Icons.grid_view_outlined,
-                  label: progress.totalTiles == 0
-                      ? 'Finding areas'
-                      : '${progress.totalTiles} areas',
-                ),
-                _ProgressChip(
                   icon: Icons.center_focus_strong,
-                  label: progress.currentTile == 0
-                      ? 'Preparing'
-                      : 'Area ${progress.currentTile}/${progress.totalTiles}',
+                  label: progress.totalDetected == 0
+                      ? 'Finding products'
+                      : '${progress.totalDetected} products found',
                 ),
+                if (progress.totalDetected > 0)
+                  _ProgressChip(
+                    icon: Icons.manage_search,
+                    label: progress.currentItem == 0
+                        ? 'Preparing crops'
+                        : 'Product ${progress.currentItem}/${progress.totalDetected}',
+                  ),
                 _ProgressChip(
                   icon: Icons.inventory_2_outlined,
-                  label: '${progress.itemCount} items found',
+                  label: '${progress.identifiedCount} identified',
                 ),
                 _ProgressChip(
                   icon: Icons.timer_outlined,
                   label: '${formatDuration(elapsed)} elapsed',
                 ),
                 if (progress.estimatedRemaining != null &&
-                    progress.stage == MultiScanStage.scanning)
+                    progress.stage == MultiScanStage.identifying)
                   _ProgressChip(
                     icon: Icons.hourglass_bottom,
                     label:
                         '~${formatDuration(progress.estimatedRemaining)} left',
                   ),
-                if (progress.failedTiles > 0)
+                if (progress.failedItems > 0)
                   _ProgressChip(
                     icon: Icons.warning_amber_rounded,
-                    label: '${progress.failedTiles} area(s) retried/failed',
+                    label: '${progress.failedItems} failed',
                   ),
               ],
             ),
