@@ -81,7 +81,7 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
                       categoryId: categoryId,
                       things: categoryThings,
                       onTap: () => context.push(
-                        '/things/category/$categoryId',
+                        '/things/category/${Uri.encodeComponent(categoryId)}',
                       ),
                     ),
                   );
@@ -130,8 +130,20 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
       case 'personal_care':
         return 'Personal care';
       default:
-        return 'Other';
+        return _prettyCategory(value);
     }
+  }
+
+  static String _prettyCategory(String value) {
+    return value
+        .split('_')
+        .where((part) => part.isNotEmpty)
+        .map(
+          (part) => part.isEmpty
+              ? part
+              : '${part[0].toUpperCase()}${part.substring(1)}',
+        )
+        .join(' ');
   }
 }
 
