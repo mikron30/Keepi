@@ -874,23 +874,16 @@ class ThingRepository {
   String? _normalizeExpiryDateText(String? value) {
     final text = value?.trim() ?? '';
     if (text.isEmpty) return null;
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}
-    switch (value) {
-      case 'new':
-        return 'newItem';
-      case 'like_new':
-        return 'likeNew';
-      case 'good':
-      case 'fair':
-      case 'poor':
-        return value;
-      default:
-        return 'unknown';
-    }
-  }
-}
-).hasMatch(text)) return null;
-    return DateTime.tryParse(text) == null ? null : text;
+
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) return null;
+
+    final normalized =
+        '${parsed.year.toString().padLeft(4, '0')}-'
+        '${parsed.month.toString().padLeft(2, '0')}-'
+        '${parsed.day.toString().padLeft(2, '0')}';
+
+    return normalized == text ? normalized : null;
   }
 
   DateTime? _parseExpiryDate(String? value) {
