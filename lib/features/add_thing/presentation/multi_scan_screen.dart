@@ -226,6 +226,12 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
           for (final draft in selectedDrafts)
             draft.item.id: draft.nameController.text.trim(),
         },
+        editedExpiryDates: {
+          for (final draft in selectedDrafts)
+            if (draft.item.categoryId == 'food' ||
+                draft.item.categoryId == 'drinks')
+              draft.item.id: draft.expiryDateController.text.trim(),
+        },
       );
 
       await _scanRepository.markReviewed(jobId);
@@ -266,6 +272,27 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
     if (lower.endsWith('.png')) return 'image/png';
     if (lower.endsWith('.webp')) return 'image/webp';
     return 'image/jpeg';
+  }
+
+  Future<void> _pickDraftExpiryDate(_BackgroundThingDraft draft) async {
+    final current = DateTime.tryParse(draft.expiryDateController.text.trim());
+    final now = DateTime.now();
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: current ?? now,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 15),
+    );
+
+    if (selected == null || !mounted) return;
+
+    setState(() {
+      draft.expiryDateController.text =
+          '${selected.year.toString().padLeft(4, '0')}-'
+          '${selected.month.toString().padLeft(2, '0')}-'
+          '${selected.day.toString().padLeft(2, '0')}';
+    });
   }
 
   void _showMessage(String message) {
@@ -497,6 +524,42 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
                                 ].join(' · '),
                                 style: Theme.of(context).textTheme.bodySmall,
                               ),
+                              if (draft.item.categoryId == 'food' ||
+                                  draft.item.categoryId == 'drinks') ...[
+                                const SizedBox(height: 8),
+                                TextField(
+                                  controller: draft.expiryDateController,
+                                  readOnly: true,
+                                  enabled: !_saving,
+                                  onTap: _saving
+                                      ? null
+                                      : () => _pickDraftExpiryDate(draft),
+                                  decoration: InputDecoration(
+                                    labelText: 'Expiry',
+                                    hintText: 'Unknown — tap to set',
+                                    isDense: true,
+                                    prefixIcon: const Icon(
+                                      Icons.event_outlined,
+                                      size: 18,
+                                    ),
+                                    suffixIcon: IconButton(
+                                      tooltip: 'Choose expiry date',
+                                      onPressed: _saving
+                                          ? null
+                                          : () =>
+                                              _pickDraftExpiryDate(draft),
+                                      icon: const Icon(
+                                        Icons.calendar_month_outlined,
+                                        size: 18,
+                                      ),
+                                    ),
+                                    helperText: draft.item.expiryDateSource ==
+                                            'printed'
+                                        ? 'AI read this from the label — verify it.'
+                                        : null,
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),
@@ -698,13 +761,18 @@ class _ProgressChip extends StatelessWidget {
 
 class _BackgroundThingDraft {
   _BackgroundThingDraft(this.item)
-      : nameController = TextEditingController(text: item.name);
+      : nameController = TextEditingController(text: item.name),
+        expiryDateController = TextEditingController(
+          text: item.expiryDateIso ?? '',
+        );
 
   final BackgroundScanItem item;
   final TextEditingController nameController;
+  final TextEditingController expiryDateController;
   bool selected = true;
 
   void dispose() {
     nameController.dispose();
+    expiryDateController.dispose();
   }
 }
