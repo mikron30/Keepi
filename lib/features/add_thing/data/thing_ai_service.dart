@@ -55,6 +55,8 @@ class ThingAiService {
           'estimatedCurrentValueIls': Schema.integer(),
           'confidence': Schema.integer(),
           'searchKeywords': Schema.array(items: Schema.string()),
+          'expiryDate': Schema.string(),
+          'expiryDateSource': Schema.string(),
         },
       );
 
@@ -81,6 +83,10 @@ Rules:
 - confidence is 0 to 100 and should reflect recognition confidence, not price confidence.
 - description should be one or two factual sentences.
 - searchKeywords should contain useful English and Hebrew search terms when possible, plus brand/model if known.
+- For food or drinks, always include the expiry fields.
+- expiryDate must be YYYY-MM-DD when a printed expiry/best-before/use-by date is clearly readable; otherwise return an empty string.
+- expiryDateSource must be "printed" when the date is visibly readable, "unknown" for food/drinks when no reliable date is visible, and "not_applicable" for non-food products.
+- Never invent an exact food expiry date.
 ''';
 
     final decoded = await _generateJson(
@@ -244,6 +250,10 @@ Rules:
 - confidence is 0 to 100 for identification confidence.
 - description should be one or two factual sentences.
 - searchKeywords should include useful English and Hebrew terms where possible.
+- For food or drinks, inspect the crop for a printed expiry/best-before/use-by date.
+- expiryDate must be YYYY-MM-DD only when the printed date is reasonably readable; otherwise return an empty string.
+- expiryDateSource must be "printed" when visible, "unknown" for food/drinks when unreadable/not visible, and "not_applicable" otherwise.
+- Never invent an exact expiry date.
 ''';
 
     final decoded = await _generateJson(
@@ -292,6 +302,8 @@ General rules:
 - Prices are approximate integer Israeli shekels (ILS); use 0 if too uncertain.
 - confidence is 0 to 100 for identification confidence.
 - searchKeywords should include useful English and Hebrew terms where possible.
+- For food/drinks, include expiryDate (YYYY-MM-DD) when a printed date is clearly readable, else empty string.
+- expiryDateSource: "printed", "unknown", or "not_applicable". Never invent an exact expiry date.
 ''';
 
     final decoded = await _generateJson(
@@ -355,6 +367,8 @@ Rules:
 - confidence is 0 to 100 for identification confidence.
 - description should be concise and factual.
 - searchKeywords should include useful English and Hebrew terms where possible.
+- For food/drinks, include expiryDate (YYYY-MM-DD) only when a printed date is readable; otherwise empty string.
+- expiryDateSource must be "printed", "unknown", or "not_applicable". Never invent an exact expiry date.
 ''';
 
     final decoded = await _generateJson(
