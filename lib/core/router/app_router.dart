@@ -8,6 +8,7 @@ import '../../features/chat/presentation/messages_screen.dart';
 import '../../features/explore/presentation/explore_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/inventory/presentation/category_things_screen.dart';
+import '../../features/inventory/presentation/edit_thing_screen.dart';
 import '../../features/inventory/presentation/my_things_screen.dart';
 import '../../features/inventory/presentation/thing_detail_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
@@ -72,6 +73,15 @@ final appRouter = GoRouter(
                   builder: (context, state) => ThingDetailScreen(
                     thingId: state.pathParameters['thingId']!,
                   ),
+                  routes: [
+                    GoRoute(
+                      path: 'edit',
+                      name: 'thing-edit',
+                      builder: (context, state) => EditThingScreen(
+                        thingId: state.pathParameters['thingId']!,
+                      ),
+                    ),
+                  ],
                 ),
               ],
             ),
