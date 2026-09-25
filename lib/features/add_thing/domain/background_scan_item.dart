@@ -15,6 +15,8 @@ class BackgroundScanItem {
     required this.estimatedCurrentValueIls,
     required this.confidence,
     required this.searchKeywords,
+    required this.expiryDateIso,
+    required this.expiryDateSource,
     required this.cropUrl,
     required this.cropStoragePath,
     required this.sourceUrl,
@@ -36,10 +38,63 @@ class BackgroundScanItem {
   final int estimatedCurrentValueIls;
   final int confidence;
   final List<String> searchKeywords;
+  final String? expiryDateIso;
+  final String expiryDateSource;
   final String cropUrl;
   final String cropStoragePath;
   final String sourceUrl;
   final String sourceStoragePath;
+
+  static String? _readExpiryDate(dynamic value) {
+    final text = value?.toString().trim() ?? '';
+    if (text.isEmpty) return null;
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}
+    String id,
+    Map<String, dynamic> data,
+  ) {
+    final recognition =
+        Map<String, dynamic>.from(data['recognition'] as Map? ?? const {});
+
+    int readInt(dynamic value) {
+      if (value is int) return value;
+      if (value is num) return value.round();
+      return int.tryParse(value?.toString() ?? '') ?? 0;
+    }
+
+    return BackgroundScanItem(
+      id: id,
+      index: readInt(data['index']),
+      status: (data['status'] ?? '').toString(),
+      hint: (data['hint'] ?? '').toString(),
+      name: (recognition['name'] ?? 'Thing').toString(),
+      categoryId: (recognition['categoryId'] ?? 'other').toString(),
+      subcategory: (recognition['subcategory'] ?? '').toString(),
+      brand: (recognition['brand'] ?? '').toString(),
+      model: (recognition['model'] ?? '').toString(),
+      condition: (recognition['condition'] ?? 'unknown').toString(),
+      description: (recognition['description'] ?? '').toString(),
+      estimatedNewPriceIls:
+          readInt(recognition['estimatedNewPriceIls']),
+      estimatedCurrentValueIls:
+          readInt(recognition['estimatedCurrentValueIls']),
+      confidence: readInt(recognition['confidence']),
+      searchKeywords:
+          (recognition['searchKeywords'] as List<dynamic>? ?? const [])
+              .map((value) => value.toString())
+              .toList(),
+      expiryDateIso: _readExpiryDate(recognition['expiryDate']),
+      expiryDateSource:
+          (recognition['expiryDateSource'] ?? 'not_applicable').toString(),
+      cropUrl: (data['cropUrl'] ?? '').toString(),
+      cropStoragePath: (data['cropStoragePath'] ?? '').toString(),
+      sourceUrl: (data['sourceUrl'] ?? '').toString(),
+      sourceStoragePath: (data['sourceStoragePath'] ?? '').toString(),
+    );
+  }
+}
+).hasMatch(text)) return null;
+    return DateTime.tryParse(text) == null ? null : text;
+  }
 
   factory BackgroundScanItem.fromMap(
     String id,
@@ -75,6 +130,9 @@ class BackgroundScanItem {
           (recognition['searchKeywords'] as List<dynamic>? ?? const [])
               .map((value) => value.toString())
               .toList(),
+      expiryDateIso: _readExpiryDate(recognition['expiryDate']),
+      expiryDateSource:
+          (recognition['expiryDateSource'] ?? 'not_applicable').toString(),
       cropUrl: (data['cropUrl'] ?? '').toString(),
       cropStoragePath: (data['cropStoragePath'] ?? '').toString(),
       sourceUrl: (data['sourceUrl'] ?? '').toString(),
