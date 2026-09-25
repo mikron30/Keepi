@@ -7,6 +7,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:image/image.dart' as img;
 
+import '../../add_thing/domain/background_scan_item.dart';
 import '../../add_thing/domain/scanned_thing_candidate.dart';
 import '../../add_thing/domain/thing_recognition.dart';
 import '../domain/thing.dart';
@@ -376,6 +377,103 @@ class ThingRepository {
       totalUploads,
       totalUploads,
       'Saved ${selected.length} Things',
+    );
+
+    return selected.length;
+  }
+
+  Future<int> createThingsFromBackgroundScan({
+    required String scanJobId,
+    required List<BackgroundScanItem> items,
+    Map<String, String> editedNames = const {},
+  }) async {
+    if (items.isEmpty) {
+      return 0;
+    }
+
+    final user = _requireUser();
+    final selected = items.take(100).toList();
+    final location = await _defaultThingLocation(user.uid);
+    final batch = _firestore.batch();
+
+    for (final item in selected) {
+      final document = _firestore.collection('things').doc();
+      final recognition = ThingRecognition(
+        name: editedNames[item.id]?.trim().isNotEmpty == true
+            ? editedNames[item.id]!.trim()
+            : item.name,
+        categoryId: item.categoryId,
+        subcategory: item.subcategory,
+        brand: item.brand,
+        model: item.model,
+        condition: item.condition,
+        description: item.description,
+        estimatedNewPriceIls: item.estimatedNewPriceIls,
+        estimatedCurrentValueIls: item.estimatedCurrentValueIls,
+        confidence: item.confidence,
+        searchKeywords: item.searchKeywords,
+      );
+
+      final photoUrls = <String>[
+        if (item.cropUrl.isNotEmpty) item.cropUrl,
+        if (item.sourceUrl.isNotEmpty) item.sourceUrl,
+      ];
+      final storagePaths = <String>[
+        if (item.cropStoragePath.isNotEmpty) item.cropStoragePath,
+        if (item.sourceStoragePath.isNotEmpty) item.sourceStoragePath,
+      ];
+
+      batch.set(
+        document,
+        _thingMap(
+          id: document.id,
+          ownerId: user.uid,
+          ownerDisplayName: _displayNameFor(user),
+          recognition: recognition,
+          name: recognition.name,
+          categoryId: recognition.categoryId,
+          subcategory: recognition.subcategory,
+          brand: recognition.brand,
+          model: recognition.model,
+          condition: recognition.condition,
+          description: recognition.description,
+          estimatedNewPriceIls: recognition.estimatedNewPriceIls,
+          estimatedCurrentValueIls: recognition.estimatedCurrentValueIls,
+          enabledActions: const {ThingAction.personalUse},
+          photoUrls: photoUrls,
+          photoStoragePaths: storagePaths,
+          thumbnailUrl:
+              item.cropUrl.isNotEmpty ? item.cropUrl : item.sourceUrl,
+          location: location,
+          scanId: scanJobId,
+        ),
+      );
+
+      if (location != null) {
+        batch.set(
+          _firestore
+              .collection('users')
+              .doc(user.uid)
+              .collection('thingLocations')
+              .doc(document.id),
+          {
+            'thingId': document.id,
+            'latitude': location['latitude'],
+            'longitude': location['longitude'],
+            'label': 'Home',
+            'updatedAt': FieldValue.serverTimestamp(),
+          },
+        );
+      }
+    }
+
+    await batch.commit().timeout(
+      const Duration(seconds: 60),
+      onTimeout: () {
+        throw TimeoutException(
+          'Saving inventory records timed out. Please try again.',
+        );
+      },
     );
 
     return selected.length;
