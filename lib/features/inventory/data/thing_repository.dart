@@ -514,6 +514,79 @@ class ThingRepository {
     return selected.length;
   }
 
+  Future<void> updateThingDetails({
+    required String thingId,
+    required String name,
+    required String categoryId,
+    required String subcategory,
+    required String brand,
+    required String model,
+    required ThingCondition condition,
+    required String description,
+    required int quantity,
+    required double? estimatedNewPrice,
+    required double? estimatedCurrentValue,
+    required DateTime? expiryDate,
+    required String locationLabel,
+    required Set<ThingAction> enabledActions,
+  }) async {
+    final user = _requireUser();
+    final reference = _firestore.collection('things').doc(thingId);
+    final snapshot = await reference.get();
+    final data = snapshot.data();
+
+    if (!snapshot.exists || data?['ownerId'] != user.uid) {
+      throw StateError('Only the owner can edit this Thing.');
+    }
+
+    final normalizedName = name.trim().isEmpty ? 'Unnamed Thing' : name.trim();
+    final normalizedCategory =
+        categoryId.trim().isEmpty ? 'other' : categoryId.trim();
+
+    final existingKeywords =
+        (data?['searchKeywords'] as List<dynamic>? ?? const [])
+            .map((value) => value.toString().toLowerCase())
+            .where((value) => value.trim().isNotEmpty)
+            .toSet();
+
+    final keywords = <String>{
+      ...existingKeywords,
+      normalizedName.toLowerCase(),
+      if (brand.trim().isNotEmpty) brand.trim().toLowerCase(),
+      if (model.trim().isNotEmpty) model.trim().toLowerCase(),
+      if (subcategory.trim().isNotEmpty) subcategory.trim().toLowerCase(),
+    }.toList();
+
+    final isPublic = enabledActions.any(
+      (action) => action != ThingAction.personalUse,
+    );
+
+    await reference.update({
+      'name': normalizedName,
+      'categoryId': normalizedCategory,
+      'subcategoryId':
+          subcategory.trim().isEmpty ? null : subcategory.trim(),
+      'description': description.trim(),
+      'quantity': quantity < 1 ? 1 : quantity,
+      'condition': condition.name,
+      'estimatedNewPrice': estimatedNewPrice,
+      'estimatedCurrentValue': estimatedCurrentValue,
+      'expiryDate':
+          expiryDate == null ? null : Timestamp.fromDate(expiryDate),
+      'locationLabel':
+          locationLabel.trim().isEmpty ? null : locationLabel.trim(),
+      'enabledActions':
+          enabledActions.map((action) => action.name).toList(),
+      'visibility': isPublic ? 'public' : 'private',
+      'searchKeywords': keywords,
+      'attributes.brand': brand.trim(),
+      'attributes.model': model.trim(),
+      'attributes.expiryDateSource':
+          expiryDate == null ? 'unknown' : 'manual',
+      'updatedAt': FieldValue.serverTimestamp(),
+    });
+  }
+
   Future<void> markThingLent({
     required String thingId,
     required String borrowerName,
