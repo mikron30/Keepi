@@ -20,81 +20,6 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
     _repository = ThingRepository();
   }
 
-  Future<void> _markLent(Thing thing) async {
-    final controller = TextEditingController();
-
-    final borrowerName = await showDialog<String>(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: Text('Who has ${thing.name}?'),
-          content: TextField(
-            controller: controller,
-            autofocus: true,
-            decoration: const InputDecoration(
-              labelText: 'Borrower / holder name',
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('Cancel'),
-            ),
-            FilledButton(
-              onPressed: () {
-                final name = controller.text.trim();
-                if (name.isNotEmpty) Navigator.pop(context, name);
-              },
-              child: const Text('Mark as lent'),
-            ),
-          ],
-        );
-      },
-    );
-
-    controller.dispose();
-
-    if (borrowerName == null || borrowerName.isEmpty) return;
-
-    try {
-      await _repository.markThingLent(
-        thingId: thing.id,
-        borrowerName: borrowerName,
-      );
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${thing.name} is now with $borrowerName.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not update loan: $error')),
-        );
-      }
-    }
-  }
-
-  Future<void> _markReturned(Thing thing) async {
-    try {
-      await _repository.markThingReturned(thing.id);
-
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${thing.name} marked as returned.')),
-        );
-      }
-    } catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('Could not mark returned: $error')),
-        );
-      }
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -112,9 +37,7 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
         stream: _repository.watchMyThings(),
         builder: (context, snapshot) {
           if (snapshot.hasError) {
-            return _ErrorState(
-              message: snapshot.error.toString(),
-            );
+            return _ErrorState(message: snapshot.error.toString());
           }
 
           if (!snapshot.hasData) {
@@ -128,21 +51,42 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
             );
           }
 
+          final grouped = <String, List<Thing>>{};
+          for (final thing in things) {
+            grouped.putIfAbsent(thing.categoryId, () => []).add(thing);
+          }
+
+          final categories = grouped.keys.toList()
+            ..sort(
+              (a, b) => _categoryLabel(a).compareTo(_categoryLabel(b)),
+            );
+
           return RefreshIndicator(
             onRefresh: () async {
-              await Future<void>.delayed(const Duration(milliseconds: 350));
+              await Future<void>.delayed(const Duration(milliseconds: 300));
             },
-            child: ListView.separated(
+            child: ListView(
               padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
-              itemCount: things.length,
-              separatorBuilder: (_, _) => const SizedBox(height: 10),
-              itemBuilder: (context, index) {
-                return _ThingCard(
-                  thing: things[index],
-                  onMarkLent: () => _markLent(things[index]),
-                  onMarkReturned: () => _markReturned(things[index]),
-                );
-              },
+              children: [
+                Text(
+                  '${things.length} Things in ${categories.length} folders',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 12),
+                ...categories.map((categoryId) {
+                  final categoryThings = grouped[categoryId]!;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _CategoryFolderCard(
+                      categoryId: categoryId,
+                      things: categoryThings,
+                      onTap: () => context.push(
+                        '/things/category/$categoryId',
+                      ),
+                    ),
+                  );
+                }),
+              ],
             ),
           );
         },
@@ -154,285 +98,209 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
       ),
     );
   }
+
+  static String _categoryLabel(String value) {
+    switch (value) {
+      case 'home':
+        return 'Home';
+      case 'vehicles':
+        return 'Vehicles';
+      case 'tools':
+        return 'Tools';
+      case 'sports':
+        return 'Sports';
+      case 'garden':
+        return 'Garden';
+      case 'electronics':
+        return 'Electronics';
+      case 'food':
+        return 'Food';
+      case 'drinks':
+        return 'Drinks';
+      case 'books':
+        return 'Books';
+      case 'clothing':
+        return 'Clothing';
+      case 'baby':
+        return 'Baby';
+      case 'camping':
+        return 'Camping';
+      case 'real_estate':
+        return 'Real estate';
+      case 'personal_care':
+        return 'Personal care';
+      default:
+        return 'Other';
+    }
+  }
 }
 
-class _ThingCard extends StatelessWidget {
-  const _ThingCard({
-    required this.thing,
-    required this.onMarkLent,
-    required this.onMarkReturned,
+class _CategoryFolderCard extends StatelessWidget {
+  const _CategoryFolderCard({
+    required this.categoryId,
+    required this.things,
+    required this.onTap,
   });
 
-  final Thing thing;
-  final VoidCallback onMarkLent;
-  final VoidCallback onMarkReturned;
+  final String categoryId;
+  final List<Thing> things;
+  final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    final brand = thing.attributes['brand']?.toString().trim() ?? '';
-    final model = thing.attributes['model']?.toString().trim() ?? '';
-    final confidence = thing.attributes['aiConfidence'];
-    final value = thing.estimatedCurrentValue;
-    final thumbnailUrl = thing.thumbnailUrl?.trim().isNotEmpty == true
-        ? thing.thumbnailUrl!.trim()
-        : (thing.photoUrls.isEmpty ? null : thing.photoUrls.first);
+    final previews = things
+        .map((thing) {
+          if (thing.thumbnailUrl?.trim().isNotEmpty == true) {
+            return thing.thumbnailUrl!.trim();
+          }
+          if (thing.photoUrls.isNotEmpty) {
+            return thing.photoUrls.first;
+          }
+          return null;
+        })
+        .whereType<String>()
+        .take(3)
+        .toList();
 
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            ClipRRect(
-              borderRadius: BorderRadius.circular(16),
-              child: SizedBox(
-                width: 92,
-                height: 92,
-                child: thumbnailUrl == null
-                    ? const ColoredBox(
-                        color: Colors.black12,
-                        child: Icon(Icons.inventory_2_outlined, size: 34),
-                      )
-                    : Image.network(
-                        thumbnailUrl,
-                        fit: BoxFit.cover,
-                        webHtmlElementStrategy: WebHtmlElementStrategy.fallback,
-                        loadingBuilder: (context, child, progress) {
-                          if (progress == null) {
-                            return child;
-                          }
-
-                          return const ColoredBox(
-                            color: Colors.black12,
-                            child: Center(
-                              child: SizedBox(
-                                width: 22,
-                                height: 22,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                        errorBuilder: (_, error, _) {
-                          debugPrint(
-                            'Keepi thumbnail failed for '
-                            '$thumbnailUrl: $error',
-                          );
-
-                          return const ColoredBox(
-                            color: Colors.black12,
-                            child: Icon(Icons.broken_image_outlined),
-                          );
-                        },
-                      ),
+      margin: EdgeInsets.zero,
+      child: InkWell(
+        borderRadius: BorderRadius.circular(18),
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _FolderPreview(
+                categoryId: categoryId,
+                previewUrls: previews,
               ),
-            ),
-            const SizedBox(width: 14),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    thing.name,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          fontWeight: FontWeight.w800,
-                        ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    [
-                      _pretty(thing.categoryId),
-                      if (thing.subcategoryId?.isNotEmpty == true)
-                        thing.subcategoryId!,
-                    ].join(' · '),
-                  ),
-                  if (brand.isNotEmpty || model.isNotEmpty) ...[
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _MyThingsScreenState._categoryLabel(categoryId),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
+                    ),
                     const SizedBox(height: 4),
                     Text(
-                      [brand, model]
-                          .where((value) => value.isNotEmpty)
-                          .join(' '),
+                      '${things.length} ${things.length == 1 ? 'Thing' : 'Things'}',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
-                  const SizedBox(height: 8),
-                  Wrap(
-                    spacing: 8,
-                    runSpacing: 6,
-                    children: [
-                      if (thing.enabledActions.isEmpty ||
-                          thing.enabledActions
-                              .contains(ThingAction.personalUse))
-                        _SmallChip(
-                          icon: thing.visibility == ThingVisibility.private
-                              ? Icons.visibility_off_outlined
-                              : Icons.home_outlined,
-                          label: thing.visibility == ThingVisibility.private
-                              ? 'Personal'
-                              : 'Personal use',
-                        ),
-                      for (final action in thing.enabledActions.where(
-                        (action) => action != ThingAction.personalUse,
-                      ))
-                        _SmallChip(
-                          icon: _actionIcon(action),
-                          label: _actionLabel(action),
-                        ),
-                      if (value != null)
-                        _SmallChip(
-                          icon: Icons.sell_outlined,
-                          label: '₪${value.round()}',
-                        ),
-                      if (confidence != null)
-                        _SmallChip(
-                          icon: Icons.auto_awesome,
-                          label: 'AI $confidence%',
-                        ),
-                      if (thing.categoryId == 'food' ||
-                          thing.categoryId == 'drinks')
-                        _SmallChip(
-                          icon: Icons.event_outlined,
-                          label: _expiryLabel(thing),
-                        ),
-                      if (thing.currentHolderName?.isNotEmpty == true)
-                        _SmallChip(
-                          icon: Icons.person_pin_circle_outlined,
-                          label: 'With ${thing.currentHolderName}',
-                        ),
-                    ],
-                  ),
-                ],
+                ),
               ),
-            ),
-            PopupMenuButton<String>(
-              tooltip: 'Thing options',
-              onSelected: (value) {
-                if (value == 'lend') onMarkLent();
-                if (value == 'returned') onMarkReturned();
-              },
-              itemBuilder: (context) => [
-                if (thing.currentHolderName?.isNotEmpty != true)
-                  const PopupMenuItem(
-                    value: 'lend',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.person_add_alt_1_outlined),
-                      title: Text('Mark as lent'),
-                    ),
-                  ),
-                if (thing.currentHolderName?.isNotEmpty == true)
-                  const PopupMenuItem(
-                    value: 'returned',
-                    child: ListTile(
-                      dense: true,
-                      leading: Icon(Icons.assignment_return_outlined),
-                      title: Text('Mark as returned'),
-                    ),
-                  ),
-              ],
-            ),
-          ],
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
       ),
     );
   }
-
-  static String _actionLabel(ThingAction action) {
-    switch (action) {
-      case ThingAction.personalUse:
-        return 'Personal use';
-      case ThingAction.sell:
-        return 'For sale';
-      case ThingAction.rent:
-        return 'For rent';
-      case ThingAction.borrow:
-        return 'For loan';
-      case ThingAction.give:
-        return 'Free';
-      case ThingAction.exchange:
-        return 'Exchange';
-    }
-  }
-
-  static IconData _actionIcon(ThingAction action) {
-    switch (action) {
-      case ThingAction.personalUse:
-        return Icons.home_outlined;
-      case ThingAction.sell:
-        return Icons.sell_outlined;
-      case ThingAction.rent:
-        return Icons.payments_outlined;
-      case ThingAction.borrow:
-        return Icons.handshake_outlined;
-      case ThingAction.give:
-        return Icons.volunteer_activism_outlined;
-      case ThingAction.exchange:
-        return Icons.swap_horiz;
-    }
-  }
-
-  static String _expiryLabel(Thing thing) {
-    final expiry = thing.expiryDate;
-    if (expiry == null) {
-      return 'Expiry unknown';
-    }
-
-    final date =
-        '${expiry.year.toString().padLeft(4, '0')}-'
-        '${expiry.month.toString().padLeft(2, '0')}-'
-        '${expiry.day.toString().padLeft(2, '0')}';
-
-    final today = DateTime.now();
-    final todayOnly = DateTime(today.year, today.month, today.day);
-    final expiryOnly = DateTime(expiry.year, expiry.month, expiry.day);
-    final days = expiryOnly.difference(todayOnly).inDays;
-
-    if (days < 0) return 'Expired $date';
-    if (days == 0) return 'Expires today';
-    if (days <= 7) return 'Expires in $days d · $date';
-    return 'Expires $date';
-  }
-
-  static String _pretty(String value) {
-    return value
-        .split('_')
-        .map((part) => part.isEmpty
-            ? part
-            : '${part[0].toUpperCase()}${part.substring(1)}')
-        .join(' ');
-  }
 }
 
-class _SmallChip extends StatelessWidget {
-  const _SmallChip({
-    required this.icon,
-    required this.label,
+class _FolderPreview extends StatelessWidget {
+  const _FolderPreview({
+    required this.categoryId,
+    required this.previewUrls,
   });
 
-  final IconData icon;
-  final String label;
+  final String categoryId;
+  final List<String> previewUrls;
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 9, vertical: 5),
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
-        borderRadius: BorderRadius.circular(999),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
+    if (previewUrls.isEmpty) {
+      return Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(
+          _categoryIcon(categoryId),
+          size: 36,
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
         children: [
-          Icon(icon, size: 14),
-          const SizedBox(width: 5),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium,
-          ),
+          for (var index = 0; index < previewUrls.length; index++)
+            Positioned(
+              left: index * 10,
+              top: index * 6,
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.surface,
+                    width: 2,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.network(
+                  previewUrls[index],
+                  fit: BoxFit.cover,
+                  webHtmlElementStrategy:
+                      WebHtmlElementStrategy.fallback,
+                  errorBuilder: (_, _, _) => ColoredBox(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                    child: Icon(_categoryIcon(categoryId)),
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
+  }
+
+  static IconData _categoryIcon(String value) {
+    switch (value) {
+      case 'books':
+        return Icons.menu_book_outlined;
+      case 'food':
+        return Icons.kitchen_outlined;
+      case 'drinks':
+        return Icons.local_drink_outlined;
+      case 'tools':
+        return Icons.handyman_outlined;
+      case 'electronics':
+        return Icons.devices_other_outlined;
+      case 'sports':
+        return Icons.sports_tennis_outlined;
+      case 'garden':
+        return Icons.yard_outlined;
+      case 'vehicles':
+        return Icons.directions_car_outlined;
+      case 'clothing':
+        return Icons.checkroom_outlined;
+      case 'baby':
+        return Icons.child_care_outlined;
+      case 'camping':
+        return Icons.camping_outlined;
+      case 'real_estate':
+        return Icons.apartment_outlined;
+      case 'personal_care':
+        return Icons.spa_outlined;
+      case 'home':
+        return Icons.home_outlined;
+      default:
+        return Icons.folder_outlined;
+    }
   }
 }
 
@@ -459,7 +327,8 @@ class _EmptyState extends StatelessWidget {
             ),
             const SizedBox(height: 8),
             const Text(
-              'Photograph your first Thing and let Keepi identify it.',
+              'Photograph your first Thing and Keepi will file it '
+              'automatically in the right folder.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
