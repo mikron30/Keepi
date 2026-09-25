@@ -289,6 +289,12 @@ class _ThingCard extends StatelessWidget {
                           icon: Icons.auto_awesome,
                           label: 'AI $confidence%',
                         ),
+                      if (thing.categoryId == 'food' ||
+                          thing.categoryId == 'drinks')
+                        _SmallChip(
+                          icon: Icons.event_outlined,
+                          label: _expiryLabel(thing),
+                        ),
                       if (thing.currentHolderName?.isNotEmpty == true)
                         _SmallChip(
                           icon: Icons.person_pin_circle_outlined,
@@ -364,6 +370,28 @@ class _ThingCard extends StatelessWidget {
       case ThingAction.exchange:
         return Icons.swap_horiz;
     }
+  }
+
+  static String _expiryLabel(Thing thing) {
+    final expiry = thing.expiryDate;
+    if (expiry == null) {
+      return 'Expiry unknown';
+    }
+
+    final date =
+        '${expiry.year.toString().padLeft(4, '0')}-'
+        '${expiry.month.toString().padLeft(2, '0')}-'
+        '${expiry.day.toString().padLeft(2, '0')}';
+
+    final today = DateTime.now();
+    final todayOnly = DateTime(today.year, today.month, today.day);
+    final expiryOnly = DateTime(expiry.year, expiry.month, expiry.day);
+    final days = expiryOnly.difference(todayOnly).inDays;
+
+    if (days < 0) return 'Expired $date';
+    if (days == 0) return 'Expires today';
+    if (days <= 7) return 'Expires in $days d · $date';
+    return 'Expires $date';
   }
 
   static String _pretty(String value) {
