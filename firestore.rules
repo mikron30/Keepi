@@ -45,6 +45,19 @@ service cloud.firestore {
       allow update, delete: if ownsExistingDocument();
     }
 
+    match /scanJobs/{jobId} {
+      allow create: if ownsNewDocument();
+      allow read, update: if ownsExistingDocument();
+      allow delete: if false;
+
+      match /items/{itemId} {
+        allow read: if signedIn()
+          && get(/databases/$(database)/documents/scanJobs/$(jobId))
+            .data.ownerId == request.auth.uid;
+        allow write: if false;
+      }
+    }
+
     match /conversations/{conversationId} {
       allow create: if isNewConversationParticipant();
       allow read: if isConversationParticipant();
