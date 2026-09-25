@@ -142,6 +142,7 @@ Write-Host "Keepi - Publish Web to Firebase Hosting" -ForegroundColor Green
 Require-Command "git.exe" "Install Git for Windows."
 Require-Command "flutter.bat" "Install Flutter and make sure it is in PATH."
 Require-Command "firebase.cmd" "Install Firebase CLI with: npm.cmd install -g firebase-tools"
+Require-Command "npm.cmd" "Install Node.js/npm before deploying Keepi Cloud Functions."
 
 if (-not (Test-Path $ProjectPath)) {
     throw "Keepi folder not found: $ProjectPath"
@@ -200,10 +201,25 @@ $versionText = "Keepi commit: $commitId`nPublished: $(Get-Date -Format o)"
 Set-Content -Path (Join-Path $ProjectPath "build\web\keepi-version.txt") -Value $versionText -Encoding ascii
 
 Write-Host ""
-Write-Host "Deploying Firebase rules..." -ForegroundColor Cyan
-firebase.cmd deploy --only "firestore:rules,storage" --project "$projectId" | Out-Host
+Write-Host "Checking Keepi Cloud Function syntax..." -ForegroundColor Cyan
+Push-Location (Join-Path $ProjectPath "functions")
+npm.cmd install | Out-Host
 if ($LASTEXITCODE -ne 0) {
-    throw "Firebase Firestore/Storage rules deployment failed."
+    Pop-Location
+    throw "Cloud Functions npm install failed."
+}
+npm.cmd run check | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    Pop-Location
+    throw "Cloud Functions syntax check failed."
+}
+Pop-Location
+
+Write-Host ""
+Write-Host "Deploying Firebase rules and background scan function..." -ForegroundColor Cyan
+firebase.cmd deploy --only "firestore:rules,storage,functions" --project "$projectId" | Out-Host
+if ($LASTEXITCODE -ne 0) {
+    throw "Firebase Firestore/Storage/Functions deployment failed."
 }
 
 Write-Host ""
