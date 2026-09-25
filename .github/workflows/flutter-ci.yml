@@ -29,3 +29,14 @@ jobs:
 
       - name: Test
         run: flutter test
+
+      - name: Install Node for Cloud Functions
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
+      - name: Install Cloud Function dependencies
+        run: npm install --prefix functions
+
+      - name: Check Cloud Function syntax
+        run: npm run --prefix functions check
