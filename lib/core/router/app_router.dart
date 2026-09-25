@@ -7,7 +7,9 @@ import '../../features/chat/presentation/chat_screen.dart';
 import '../../features/chat/presentation/messages_screen.dart';
 import '../../features/explore/presentation/explore_screen.dart';
 import '../../features/home/presentation/home_screen.dart';
+import '../../features/inventory/presentation/category_things_screen.dart';
 import '../../features/inventory/presentation/my_things_screen.dart';
+import '../../features/inventory/presentation/thing_detail_screen.dart';
 import '../../features/profile/presentation/profile_screen.dart';
 import '../../features/shell/presentation/main_shell.dart';
 
@@ -56,6 +58,22 @@ final appRouter = GoRouter(
               path: '/things',
               name: 'things',
               builder: (context, state) => const MyThingsScreen(),
+              routes: [
+                GoRoute(
+                  path: 'category/:categoryId',
+                  name: 'things-category',
+                  builder: (context, state) => CategoryThingsScreen(
+                    categoryId: state.pathParameters['categoryId']!,
+                  ),
+                ),
+                GoRoute(
+                  path: ':thingId',
+                  name: 'thing-detail',
+                  builder: (context, state) => ThingDetailScreen(
+                    thingId: state.pathParameters['thingId']!,
+                  ),
+                ),
+              ],
             ),
           ],
         ),
