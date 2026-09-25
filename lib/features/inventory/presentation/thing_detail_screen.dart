@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 
 import '../data/thing_repository.dart';
 import '../domain/thing.dart';
@@ -141,7 +142,16 @@ class _ThingDetailScreenState extends State<ThingDetailScreen> {
         }
 
         return Scaffold(
-          appBar: AppBar(title: Text(thing.name)),
+          appBar: AppBar(
+            title: Text(thing.name),
+            actions: [
+              IconButton(
+                tooltip: 'Edit Thing',
+                onPressed: () => context.push('/things/${thing.id}/edit'),
+                icon: const Icon(Icons.edit_outlined),
+              ),
+            ],
+          ),
           body: ListView(
             padding: const EdgeInsets.fromLTRB(16, 10, 16, 36),
             children: [
