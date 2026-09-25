@@ -291,7 +291,7 @@ class _FolderPreview extends StatelessWidget {
       case 'baby':
         return Icons.child_care_outlined;
       case 'camping':
-        return Icons.camping_outlined;
+        return Icons.terrain_outlined;
       case 'real_estate':
         return Icons.apartment_outlined;
       case 'personal_care':
