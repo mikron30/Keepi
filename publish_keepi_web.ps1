@@ -69,6 +69,29 @@ function Require-Command([string]$Name, [string]$HelpText) {
     }
 }
 
+function Deploy-FunctionsWithRetry([string]$ProjectId) {
+    $maxAttempts = 3
+
+    for ($attempt = 1; $attempt -le $maxAttempts; $attempt++) {
+        Write-Host "Deploying Cloud Functions (attempt $attempt of $maxAttempts)..." -ForegroundColor Cyan
+        firebase.cmd deploy --only "functions" --project "$ProjectId" | Out-Host
+
+        if ($LASTEXITCODE -eq 0) {
+            return
+        }
+
+        if ($attempt -lt $maxAttempts) {
+            $waitSeconds = 20 * $attempt
+            Write-Host ""
+            Write-Host "Functions deployment failed. Google Cloud APIs may still be propagating." -ForegroundColor Yellow
+            Write-Host "Waiting $waitSeconds seconds and retrying..." -ForegroundColor Yellow
+            Start-Sleep -Seconds $waitSeconds
+        }
+    }
+
+    throw "Firebase Functions deployment failed after $maxAttempts attempts."
+}
+
 function Get-ExistingHostingSites([string]$ProjectId) {
     $raw = firebase.cmd hosting:sites:list --project "$ProjectId" --json | Out-String
     if ($LASTEXITCODE -ne 0) {
@@ -216,11 +239,14 @@ if ($LASTEXITCODE -ne 0) {
 Pop-Location
 
 Write-Host ""
-Write-Host "Deploying Firebase rules and background scan function..." -ForegroundColor Cyan
-firebase.cmd deploy --only "firestore:rules,storage,functions" --project "$projectId" | Out-Host
+Write-Host "Deploying Firebase rules..." -ForegroundColor Cyan
+firebase.cmd deploy --only "firestore:rules,storage" --project "$projectId" | Out-Host
 if ($LASTEXITCODE -ne 0) {
-    throw "Firebase Firestore/Storage/Functions deployment failed."
+    throw "Firebase Firestore/Storage rules deployment failed."
 }
+
+Write-Host ""
+Deploy-FunctionsWithRetry -ProjectId $projectId
 
 Write-Host ""
 Write-Host "Deploying to Firebase Hosting..." -ForegroundColor Cyan
