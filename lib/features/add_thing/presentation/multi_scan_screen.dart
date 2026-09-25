@@ -344,9 +344,9 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
           if (_jobIsActive)
             const Card(
               child: ListTile(
-                leading: const Icon(Icons.cloud_done_outlined),
-                title: const Text('Background scan is running'),
-                subtitle: const Text(
+                leading: Icon(Icons.cloud_done_outlined),
+                title: Text('Background scan is running'),
+                subtitle: Text(
                   'The photo is already on Keepi servers. You can leave this '
                   'screen or close the app; processing will continue.',
                 ),
