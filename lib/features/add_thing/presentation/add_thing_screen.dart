@@ -54,6 +54,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
   final _newPriceController = TextEditingController();
   final _usedPriceController = TextEditingController();
   final _descriptionController = TextEditingController();
+  final _expiryDateController = TextEditingController();
 
   Uint8List? _imageBytes;
   String? _imageName;
@@ -74,6 +75,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
     _newPriceController.dispose();
     _usedPriceController.dispose();
     _descriptionController.dispose();
+    _expiryDateController.dispose();
     super.dispose();
   }
 
@@ -156,6 +158,7 @@ class _AddThingScreenState extends State<AddThingScreen> {
             ? recognition.estimatedCurrentValueIls.toString()
             : '';
         _descriptionController.text = recognition.description;
+        _expiryDateController.text = recognition.expiryDateIso ?? '';
         _category = _categories.contains(recognition.categoryId)
             ? recognition.categoryId
             : 'other';
@@ -210,6 +213,15 @@ class _AddThingScreenState extends State<AddThingScreen> {
         estimatedNewPriceIls: _parsePrice(_newPriceController.text),
         estimatedCurrentValueIls: _parsePrice(_usedPriceController.text),
         enabledActions: _enabledActions,
+        expiryDateIso: _expiryDateController.text.trim().isEmpty
+            ? null
+            : _expiryDateController.text.trim(),
+        expiryDateSource:
+            _expiryDateController.text.trim() == (recognition.expiryDateIso ?? '')
+                ? recognition.expiryDateSource
+                : (_expiryDateController.text.trim().isEmpty
+                    ? 'unknown'
+                    : 'manual'),
       );
 
       if (!mounted) {
@@ -252,8 +264,30 @@ class _AddThingScreenState extends State<AddThingScreen> {
     _newPriceController.clear();
     _usedPriceController.clear();
     _descriptionController.clear();
+    _expiryDateController.clear();
     _category = 'other';
     _condition = 'unknown';
+  }
+
+  Future<void> _pickExpiryDate() async {
+    final current = DateTime.tryParse(_expiryDateController.text.trim());
+    final now = DateTime.now();
+
+    final selected = await showDatePicker(
+      context: context,
+      initialDate: current ?? now,
+      firstDate: DateTime(now.year - 2),
+      lastDate: DateTime(now.year + 15),
+    );
+
+    if (selected == null || !mounted) return;
+
+    setState(() {
+      _expiryDateController.text =
+          '${selected.year.toString().padLeft(4, '0')}-'
+          '${selected.month.toString().padLeft(2, '0')}-'
+          '${selected.day.toString().padLeft(2, '0')}';
+    });
   }
 
   void _toggleAction(ThingAction action, bool selected) {
@@ -427,6 +461,9 @@ class _AddThingScreenState extends State<AddThingScreen> {
               newPriceController: _newPriceController,
               usedPriceController: _usedPriceController,
               descriptionController: _descriptionController,
+              expiryDateController: _expiryDateController,
+              expiryDateSource: _recognition!.expiryDateSource,
+              onPickExpiryDate: _pickExpiryDate,
               category: _category,
               condition: _condition,
               categories: _categories,
@@ -543,6 +580,9 @@ class _RecognitionEditor extends StatelessWidget {
     required this.newPriceController,
     required this.usedPriceController,
     required this.descriptionController,
+    required this.expiryDateController,
+    required this.expiryDateSource,
+    required this.onPickExpiryDate,
     required this.category,
     required this.condition,
     required this.categories,
@@ -559,6 +599,9 @@ class _RecognitionEditor extends StatelessWidget {
   final TextEditingController newPriceController;
   final TextEditingController usedPriceController;
   final TextEditingController descriptionController;
+  final TextEditingController expiryDateController;
+  final String expiryDateSource;
+  final VoidCallback onPickExpiryDate;
   final String category;
   final String condition;
   final List<String> categories;
@@ -692,6 +735,29 @@ class _RecognitionEditor extends StatelessWidget {
             ),
           ],
         ),
+        if (category == 'food' || category == 'drinks') ...[
+          const SizedBox(height: 12),
+          TextField(
+            controller: expiryDateController,
+            readOnly: true,
+            onTap: onPickExpiryDate,
+            decoration: InputDecoration(
+              labelText: 'Expiry / best-before date',
+              hintText: 'YYYY-MM-DD',
+              prefixIcon: const Icon(Icons.event_outlined),
+              suffixIcon: IconButton(
+                tooltip: 'Choose expiry date',
+                onPressed: onPickExpiryDate,
+                icon: const Icon(Icons.calendar_month_outlined),
+              ),
+              helperText: expiryDateController.text.isEmpty
+                  ? 'Date not readable in the photo — tap to set it.'
+                  : expiryDateSource == 'printed'
+                      ? 'Read from the product label by AI. Please verify it.'
+                      : 'Expiry date can be corrected before saving.',
+            ),
+          ),
+        ],
         const SizedBox(height: 12),
         TextField(
           controller: descriptionController,
