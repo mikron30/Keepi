@@ -125,7 +125,7 @@ class _ThingDetailScreenState extends State<ThingDetailScreen> {
           );
         }
 
-        if (!snapshot.hasData) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
           return Scaffold(
             appBar: AppBar(title: const Text('Thing')),
             body: const Center(child: CircularProgressIndicator()),
