@@ -342,7 +342,7 @@ class _MultiScanScreenState extends State<MultiScanScreen> {
             const SizedBox(height: 16),
           ],
           if (_jobIsActive)
-            Card(
+            const Card(
               child: ListTile(
                 leading: const Icon(Icons.cloud_done_outlined),
                 title: const Text('Background scan is running'),
