@@ -514,7 +514,9 @@ Return JSON exactly in this shape:
   "estimatedNewPriceIls": 0,
   "estimatedCurrentValueIls": 0,
   "confidence": 0,
-  "searchKeywords": []
+  "searchKeywords": [],
+  "expiryDate": "",
+  "expiryDateSource": "not_applicable"
 }
 
 Rules:
@@ -527,6 +529,11 @@ Rules:
 - Prices are approximate integer ILS. Use 0 when uncertain.
 - confidence is 0..100 for identification confidence.
 - Add useful English and Hebrew search keywords when possible.
+- For food or drinks, always populate expiryDateSource.
+- If a printed expiry / best-before / use-by date is clearly readable, set expiryDate to YYYY-MM-DD and expiryDateSource to "printed".
+- If this is food/drink but no reliable printed date is visible, set expiryDate to "" and expiryDateSource to "unknown".
+- For non-food items, set expiryDate to "" and expiryDateSource to "not_applicable".
+- Never invent an exact expiry date.
 `;
 
   const decoded = await callGeminiJson({
@@ -853,7 +860,29 @@ function normalizeRecognition(raw) {
     ),
     confidence: clampNumber(raw.confidence, 0, 100),
     searchKeywords: keywords,
+    expiryDate: normalizeExpiryDate(raw.expiryDate),
+    expiryDateSource: normalizeExpiryDateSource(raw.expiryDateSource, categoryId),
   };
+}
+
+function normalizeExpiryDate(value) {
+  const text = String(value || "").trim();
+  if (!/^\\d{4}-\\d{2}-\\d{2}$/.test(text)) {
+    return "";
+  }
+  const parsed = new Date(`${text}T00:00:00Z`);
+  return Number.isNaN(parsed.getTime()) ? "" : text;
+}
+
+function normalizeExpiryDateSource(value, categoryId) {
+  const source = String(value || "").trim().toLowerCase();
+  if (source === "printed" || source === "manual") {
+    return source;
+  }
+  if (categoryId === "food" || categoryId === "drinks") {
+    return "unknown";
+  }
+  return "not_applicable";
 }
 
 function parseJsonText(text) {
