@@ -109,7 +109,15 @@ class CategoryThingsScreen extends StatelessWidget {
       case 'personal_care':
         return 'Personal care';
       default:
-        return 'Other';
+        return value
+            .split('_')
+            .where((part) => part.isNotEmpty)
+            .map(
+              (part) => part.isEmpty
+                  ? part
+                  : '${part[0].toUpperCase()}${part.substring(1)}',
+            )
+            .join(' ');
     }
   }
 }
