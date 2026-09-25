@@ -48,52 +48,16 @@ class BackgroundScanItem {
   static String? _readExpiryDate(dynamic value) {
     final text = value?.toString().trim() ?? '';
     if (text.isEmpty) return null;
-    if (!RegExp(r'^\d{4}-\d{2}-\d{2}
-    String id,
-    Map<String, dynamic> data,
-  ) {
-    final recognition =
-        Map<String, dynamic>.from(data['recognition'] as Map? ?? const {});
 
-    int readInt(dynamic value) {
-      if (value is int) return value;
-      if (value is num) return value.round();
-      return int.tryParse(value?.toString() ?? '') ?? 0;
-    }
+    final parsed = DateTime.tryParse(text);
+    if (parsed == null) return null;
 
-    return BackgroundScanItem(
-      id: id,
-      index: readInt(data['index']),
-      status: (data['status'] ?? '').toString(),
-      hint: (data['hint'] ?? '').toString(),
-      name: (recognition['name'] ?? 'Thing').toString(),
-      categoryId: (recognition['categoryId'] ?? 'other').toString(),
-      subcategory: (recognition['subcategory'] ?? '').toString(),
-      brand: (recognition['brand'] ?? '').toString(),
-      model: (recognition['model'] ?? '').toString(),
-      condition: (recognition['condition'] ?? 'unknown').toString(),
-      description: (recognition['description'] ?? '').toString(),
-      estimatedNewPriceIls:
-          readInt(recognition['estimatedNewPriceIls']),
-      estimatedCurrentValueIls:
-          readInt(recognition['estimatedCurrentValueIls']),
-      confidence: readInt(recognition['confidence']),
-      searchKeywords:
-          (recognition['searchKeywords'] as List<dynamic>? ?? const [])
-              .map((value) => value.toString())
-              .toList(),
-      expiryDateIso: _readExpiryDate(recognition['expiryDate']),
-      expiryDateSource:
-          (recognition['expiryDateSource'] ?? 'not_applicable').toString(),
-      cropUrl: (data['cropUrl'] ?? '').toString(),
-      cropStoragePath: (data['cropStoragePath'] ?? '').toString(),
-      sourceUrl: (data['sourceUrl'] ?? '').toString(),
-      sourceStoragePath: (data['sourceStoragePath'] ?? '').toString(),
-    );
-  }
-}
-).hasMatch(text)) return null;
-    return DateTime.tryParse(text) == null ? null : text;
+    final normalized =
+        '${parsed.year.toString().padLeft(4, '0')}-'
+        '${parsed.month.toString().padLeft(2, '0')}-'
+        '${parsed.day.toString().padLeft(2, '0')}';
+
+    return normalized == text ? normalized : null;
   }
 
   factory BackgroundScanItem.fromMap(
@@ -121,8 +85,7 @@ class BackgroundScanItem {
       model: (recognition['model'] ?? '').toString(),
       condition: (recognition['condition'] ?? 'unknown').toString(),
       description: (recognition['description'] ?? '').toString(),
-      estimatedNewPriceIls:
-          readInt(recognition['estimatedNewPriceIls']),
+      estimatedNewPriceIls: readInt(recognition['estimatedNewPriceIls']),
       estimatedCurrentValueIls:
           readInt(recognition['estimatedCurrentValueIls']),
       confidence: readInt(recognition['confidence']),
