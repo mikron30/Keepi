@@ -71,6 +71,8 @@ class ThingRepository {
     required int estimatedNewPriceIls,
     required int estimatedCurrentValueIls,
     required Set<ThingAction> enabledActions,
+    String? expiryDateIso,
+    String? expiryDateSource,
   }) async {
     final user = _requireUser();
 
@@ -110,6 +112,8 @@ class ThingRepository {
             photoStoragePaths: [storageRef.fullPath],
             thumbnailUrl: downloadUrl,
             location: location,
+            expiryDateIsoOverride: expiryDateIso,
+            expiryDateSourceOverride: expiryDateSource,
           ),
         )
         .timeout(
@@ -386,6 +390,7 @@ class ThingRepository {
     required String scanJobId,
     required List<BackgroundScanItem> items,
     Map<String, String> editedNames = const {},
+    Map<String, String> editedExpiryDates = const {},
   }) async {
     if (items.isEmpty) {
       return 0;
@@ -412,6 +417,14 @@ class ThingRepository {
         estimatedCurrentValueIls: item.estimatedCurrentValueIls,
         confidence: item.confidence,
         searchKeywords: item.searchKeywords,
+        expiryDateIso: editedExpiryDates.containsKey(item.id)
+            ? _normalizeExpiryDateText(editedExpiryDates[item.id])
+            : item.expiryDateIso,
+        expiryDateSource: editedExpiryDates.containsKey(item.id)
+            ? (editedExpiryDates[item.id]?.trim().isEmpty == true
+                ? 'unknown'
+                : 'manual')
+            : item.expiryDateSource,
       );
 
       final photoUrls = <String>[
@@ -614,13 +627,22 @@ class ThingRepository {
     String? thumbnailUrl,
     required Map<String, double>? location,
     String? scanId,
+    String? expiryDateIsoOverride,
+    String? expiryDateSourceOverride,
   }) {
     final now = FieldValue.serverTimestamp();
+    final expiryDateIso =
+        expiryDateIsoOverride ?? recognition.expiryDateIso;
+    final expiryDateSource =
+        expiryDateSourceOverride ?? recognition.expiryDateSource;
+    final expiryDate = _parseExpiryDate(expiryDateIso);
+
     final attributes = <String, dynamic>{
       'brand': brand.trim(),
       'model': model.trim(),
       'aiConfidence': recognition.confidence,
       'recognizedBy': 'agent-platform-gemini',
+      'expiryDateSource': expiryDateSource,
     };
 
     if (scanId != null) {
@@ -659,6 +681,9 @@ class ThingRepository {
       'estimatedCurrentValue': estimatedCurrentValueIls > 0
           ? estimatedCurrentValueIls.toDouble()
           : null,
+      'expiryDate':
+          expiryDate == null ? null : Timestamp.fromDate(expiryDate),
+      'openedAt': null,
       'latitude': location == null
           ? null
           : _coarseCoordinate(location['latitude']!),
@@ -844,6 +869,36 @@ class ThingRepository {
       default:
         return 'jpg';
     }
+  }
+
+  String? _normalizeExpiryDateText(String? value) {
+    final text = value?.trim() ?? '';
+    if (text.isEmpty) return null;
+    if (!RegExp(r'^\d{4}-\d{2}-\d{2}
+    switch (value) {
+      case 'new':
+        return 'newItem';
+      case 'like_new':
+        return 'likeNew';
+      case 'good':
+      case 'fair':
+      case 'poor':
+        return value;
+      default:
+        return 'unknown';
+    }
+  }
+}
+).hasMatch(text)) return null;
+    return DateTime.tryParse(text) == null ? null : text;
+  }
+
+  DateTime? _parseExpiryDate(String? value) {
+    final normalized = _normalizeExpiryDateText(value);
+    if (normalized == null) return null;
+    final parsed = DateTime.tryParse(normalized);
+    if (parsed == null) return null;
+    return DateTime(parsed.year, parsed.month, parsed.day);
   }
 
   String _normalizeCondition(String value) {
