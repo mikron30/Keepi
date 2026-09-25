@@ -45,6 +45,28 @@ class ThingRepository {
     });
   }
 
+  Stream<Thing?> watchThing(String thingId) {
+    final user = _auth.currentUser;
+    if (user == null) {
+      return Stream.value(null);
+    }
+
+    return _firestore.collection('things').doc(thingId).snapshots().map(
+          (snapshot) {
+            final data = snapshot.data();
+            if (!snapshot.exists || data == null) {
+              return null;
+            }
+
+            if (data['ownerId'] != user.uid) {
+              return null;
+            }
+
+            return Thing.fromMap(snapshot.id, data);
+          },
+        );
+  }
+
   Stream<List<Thing>> watchPublicThings() {
     return _firestore
         .collection('things')
