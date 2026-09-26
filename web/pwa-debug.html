@@ -1,0 +1,528 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#FF634D">
+  <meta name="description" content="Keepi PWA install diagnostics">
+  <link rel="manifest" href="/manifest.json">
+  <link rel="icon" href="/icons/keepi-192.png">
+  <title>Keepi PWA Debug</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg:#07111D;
+      --card:#0F1A27;
+      --card2:#14202D;
+      --text:#F8F1ED;
+      --muted:#AAB3BF;
+      --accent:#FF634D;
+      --gold:#FFC866;
+      --ok:#72D89B;
+      --bad:#FF7D7D;
+      --warn:#FFC866;
+      --border:#2A3948;
+    }
+    * { box-sizing: border-box; }
+    body {
+      margin:0; padding:20px 16px 48px;
+      font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
+      background:var(--bg); color:var(--text);
+    }
+    .wrap { max-width:760px; margin:0 auto; }
+    h1 { margin:0 0 4px; font-size:28px; }
+    .sub { color:var(--muted); margin:0 0 18px; }
+    .summary {
+      background:linear-gradient(135deg,#311610,#0F1A27);
+      border:1px solid rgba(255,99,77,.45);
+      border-radius:20px; padding:16px; margin-bottom:14px;
+    }
+    .row {
+      display:flex; align-items:flex-start; gap:10px;
+      padding:12px 0; border-bottom:1px solid var(--border);
+    }
+    .row:last-child { border-bottom:0; }
+    .icon { width:26px; flex:0 0 26px; font-size:19px; text-align:center; }
+    .label { font-weight:750; }
+    .value { color:var(--muted); font-size:14px; margin-top:3px; word-break:break-word; }
+    .ok { color:var(--ok); }
+    .bad { color:var(--bad); }
+    .warn { color:var(--warn); }
+    .card {
+      background:var(--card); border:1px solid var(--border);
+      border-radius:18px; padding:14px 16px; margin-top:12px;
+    }
+    .card h2 { font-size:18px; margin:0 0 6px; }
+    button,a.btn {
+      appearance:none; border:0; border-radius:14px;
+      padding:13px 16px; font-size:16px; font-weight:800;
+      text-decoration:none; cursor:pointer; display:inline-flex;
+      align-items:center; justify-content:center; gap:8px;
+    }
+    .primary { background:var(--accent); color:white; }
+    .secondary { background:var(--card2); color:var(--text); border:1px solid var(--border); }
+    .buttons { display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:14px; }
+    pre {
+      white-space:pre-wrap; word-break:break-word; font-size:12px;
+      background:#050A11; border-radius:12px; padding:12px;
+      color:#CCD5E0; max-height:360px; overflow:auto;
+    }
+    .bigstatus { font-size:20px; font-weight:900; margin-bottom:6px; }
+    .tiny { color:var(--muted); font-size:12px; }
+    code { color:var(--gold); }
+  </style>
+  <script>
+    window.__keepiInstallPrompt = null;
+    window.__keepiInstallPromptSeen = false;
+    window.__keepiAppInstalledSeen = false;
+    window.addEventListener('beforeinstallprompt', (event) => {
+      event.preventDefault();
+      window.__keepiInstallPrompt = event;
+      window.__keepiInstallPromptSeen = true;
+      window.dispatchEvent(new Event('keepi-installability-changed'));
+    });
+    window.addEventListener('appinstalled', () => {
+      window.__keepiAppInstalledSeen = true;
+      window.dispatchEvent(new Event('keepi-installability-changed'));
+    });
+  </script>
+</head>
+<body>
+<div class="wrap">
+  <h1>Keepi PWA Debug</h1>
+  <p class="sub">This page checks what Chrome sees on this phone.</p>
+
+  <div class="summary">
+    <div id="overall" class="bigstatus">Running checks…</div>
+    <div id="overallDetail" class="value">Please wait a few seconds.</div>
+    <div class="buttons">
+      <button class="primary" id="installBtn" disabled>Try install</button>
+      <button class="secondary" id="copyBtn">Copy report</button>
+    </div>
+  </div>
+
+  <div class="card"><h2>Installability</h2><div id="installability"></div></div>
+  <div class="card"><h2>Manifest</h2><div id="manifestChecks"></div></div>
+  <div class="card"><h2>Icons</h2><div id="iconChecks"></div></div>
+  <div class="card"><h2>Service worker</h2><div id="swChecks"></div></div>
+  <div class="card"><h2>Browser / device</h2><div id="browserChecks"></div></div>
+  <div class="card">
+    <h2>Raw report</h2>
+    <pre id="rawReport">Preparing…</pre>
+  </div>
+
+  <div class="buttons">
+    <button class="secondary" id="rerunBtn">Run checks again</button>
+    <a class="btn secondary" href="/">Open Keepi</a>
+  </div>
+  <p class="tiny">Tip: tap this page once and leave it open for 30–40 seconds, then press “Run checks again”.</p>
+</div>
+
+<script>
+(() => {
+  const report = {
+    generatedAt: null,
+    url: location.href,
+    secureContext: window.isSecureContext,
+    protocol: location.protocol,
+    userAgent: navigator.userAgent,
+    platform: navigator.platform || null,
+    language: navigator.language,
+    online: navigator.onLine,
+    displayModeStandalone:
+      matchMedia('(display-mode: standalone)').matches ||
+      navigator.standalone === true,
+    beforeInstallPromptSeen: false,
+    appInstalledEventSeen: false,
+    userTapped: localStorage.getItem('keepi_debug_tapped') === '1',
+    timeOnPageSeconds: 0,
+    manifest: {},
+    icons: [],
+    serviceWorker: {},
+    installedRelatedApps: null,
+    errors: []
+  };
+
+  const started = Date.now();
+
+  document.addEventListener('click', () => {
+    report.userTapped = true;
+    localStorage.setItem('keepi_debug_tapped', '1');
+  }, { once: true });
+
+  function esc(v) {
+    return String(v ?? '').replace(/[&<>"]/g, s => ({
+      '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'
+    }[s]));
+  }
+
+  function statusRow(label, ok, value, warning=false) {
+    const cls = ok ? 'ok' : (warning ? 'warn' : 'bad');
+    const symbol = ok ? '✓' : (warning ? '!' : '✕');
+    return '<div class="row"><div class="icon '+cls+'">'+symbol+'</div>' +
+      '<div><div class="label">'+esc(label)+'</div>' +
+      '<div class="value">'+esc(value)+'</div></div></div>';
+  }
+
+  async function withTimeout(promise, ms, label) {
+    let timer;
+    try {
+      return await Promise.race([
+        promise,
+        new Promise((_, reject) => {
+          timer = setTimeout(() => reject(new Error(label + ' timed out')), ms);
+        })
+      ]);
+    } finally {
+      clearTimeout(timer);
+    }
+  }
+
+  async function checkManifest() {
+    const manifestLink = document.querySelector('link[rel="manifest"]');
+    report.manifest.linkPresent = !!manifestLink;
+    report.manifest.href = manifestLink ? manifestLink.href : null;
+
+    if (!manifestLink) {
+      report.manifest.fetchOk = false;
+      report.manifest.error = 'No <link rel="manifest"> found';
+      return;
+    }
+
+    try {
+      const res = await fetch(manifestLink.href, { cache: 'no-store' });
+      report.manifest.httpStatus = res.status;
+      report.manifest.contentType = res.headers.get('content-type');
+      report.manifest.fetchOk = res.ok;
+      const text = await res.text();
+      report.manifest.raw = text;
+      if (!res.ok) return;
+
+      const m = JSON.parse(text);
+      report.manifest.parsed = m;
+      report.manifest.hasName = !!(m.name || m.short_name);
+      report.manifest.hasStartUrl = !!m.start_url;
+      report.manifest.displayOk =
+        ['fullscreen','standalone','minimal-ui','window-controls-overlay']
+          .includes(m.display);
+      report.manifest.preferRelatedOk = m.prefer_related_applications !== true;
+      report.manifest.has192 = Array.isArray(m.icons) &&
+        m.icons.some(i => String(i.sizes || '').split(/\s+/).includes('192x192'));
+      report.manifest.has512 = Array.isArray(m.icons) &&
+        m.icons.some(i => String(i.sizes || '').split(/\s+/).includes('512x512'));
+
+      const base = new URL(manifestLink.href);
+      const start = m.start_url ? new URL(m.start_url, base) : null;
+      const scope = m.scope ? new URL(m.scope, base) : new URL('./', start || base);
+      report.manifest.resolvedStartUrl = start ? start.href : null;
+      report.manifest.resolvedScope = scope.href;
+      report.manifest.startWithinScope =
+        !!start && start.href.startsWith(scope.href);
+
+      report.icons = [];
+      for (const icon of (m.icons || [])) {
+        const src = new URL(icon.src, base).href;
+        const item = {
+          src,
+          declaredSizes: icon.sizes || '',
+          purpose: icon.purpose || 'any',
+          type: icon.type || null
+        };
+        try {
+          const iconRes = await fetch(src, { cache: 'no-store' });
+          item.httpStatus = iconRes.status;
+          item.fetchOk = iconRes.ok;
+          item.contentType = iconRes.headers.get('content-type');
+        } catch (e) {
+          item.fetchOk = false;
+          item.fetchError = String(e);
+        }
+
+        try {
+          const dim = await withTimeout(new Promise((resolve, reject) => {
+            const img = new Image();
+            img.onload = () => resolve({
+              width: img.naturalWidth,
+              height: img.naturalHeight
+            });
+            img.onerror = () => reject(new Error('Image decode/load failed'));
+            img.src = src + (src.includes('?') ? '&' : '?') + 'debug=' + Date.now();
+          }), 5000, 'Image dimension check');
+          item.actualWidth = dim.width;
+          item.actualHeight = dim.height;
+          item.square = dim.width === dim.height;
+          const declared = String(item.declaredSizes).split(/\s+/);
+          item.actualMatchesDeclared =
+            declared.includes(dim.width + 'x' + dim.height);
+        } catch (e) {
+          item.dimensionError = String(e);
+        }
+        report.icons.push(item);
+      }
+    } catch (e) {
+      report.manifest.fetchOk = false;
+      report.manifest.error = String(e);
+      report.errors.push('Manifest: ' + e);
+    }
+  }
+
+  async function checkServiceWorker() {
+    report.serviceWorker.supported = 'serviceWorker' in navigator;
+    if (!report.serviceWorker.supported) return;
+
+    try {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      report.serviceWorker.registrationCount = regs.length;
+      report.serviceWorker.registrations = regs.map(r => ({
+        scope: r.scope,
+        active: r.active ? {
+          scriptURL: r.active.scriptURL,
+          state: r.active.state
+        } : null,
+        waiting: r.waiting ? {
+          scriptURL: r.waiting.scriptURL,
+          state: r.waiting.state
+        } : null,
+        installing: r.installing ? {
+          scriptURL: r.installing.scriptURL,
+          state: r.installing.state
+        } : null
+      }));
+      report.serviceWorker.controller = navigator.serviceWorker.controller
+        ? {
+            scriptURL: navigator.serviceWorker.controller.scriptURL,
+            state: navigator.serviceWorker.controller.state
+          }
+        : null;
+
+      try {
+        const ready = await withTimeout(
+          navigator.serviceWorker.ready,
+          4000,
+          'Service worker ready'
+        );
+        report.serviceWorker.ready = true;
+        report.serviceWorker.readyScope = ready.scope;
+      } catch (e) {
+        report.serviceWorker.ready = false;
+        report.serviceWorker.readyError = String(e);
+      }
+    } catch (e) {
+      report.serviceWorker.error = String(e);
+      report.errors.push('ServiceWorker: ' + e);
+    }
+  }
+
+  async function checkRelatedApps() {
+    if ('getInstalledRelatedApps' in navigator) {
+      try {
+        report.installedRelatedApps =
+          await navigator.getInstalledRelatedApps();
+      } catch (e) {
+        report.installedRelatedApps = { error: String(e) };
+      }
+    } else {
+      report.installedRelatedApps = 'API not supported';
+    }
+  }
+
+  function render() {
+    report.generatedAt = new Date().toISOString();
+    report.beforeInstallPromptSeen = !!window.__keepiInstallPromptSeen;
+    report.appInstalledEventSeen = !!window.__keepiAppInstalledSeen;
+    report.timeOnPageSeconds = Math.floor((Date.now() - started) / 1000);
+
+    const m = report.manifest;
+    const manifestOk =
+      m.fetchOk &&
+      m.hasName &&
+      m.hasStartUrl &&
+      m.displayOk &&
+      m.preferRelatedOk &&
+      m.has192 &&
+      m.has512 &&
+      m.startWithinScope;
+
+    const iconsOk =
+      report.icons.length > 0 &&
+      report.icons.every(i =>
+        i.fetchOk &&
+        i.square === true &&
+        i.actualMatchesDeclared === true
+      );
+
+    const baseOk = report.secureContext && manifestOk && iconsOk;
+
+    let overallText = '';
+    let overallDetail = '';
+
+    if (report.displayModeStandalone || report.appInstalledEventSeen) {
+      overallText = '✓ Keepi appears installed';
+      overallDetail = 'The browser reports standalone/installed mode.';
+    } else if (report.beforeInstallPromptSeen) {
+      overallText = '✓ Chrome says Keepi is installable';
+      overallDetail =
+        'beforeinstallprompt fired. Use “Try install” below.';
+    } else if (!baseOk) {
+      overallText = '✕ A technical install requirement failed';
+      overallDetail =
+        'See the red checks below. This is likely the blocker.';
+    } else {
+      overallText = '! Technical checks pass, but Chrome has not offered install yet';
+      overallDetail =
+        'Possible causes: engagement timing, an existing/partial install, browser/device policy, or Chrome-specific state.';
+    }
+
+    document.getElementById('overall').textContent = overallText;
+    document.getElementById('overallDetail').textContent = overallDetail;
+
+    document.getElementById('installBtn').disabled =
+      !window.__keepiInstallPrompt;
+
+    document.getElementById('installability').innerHTML =
+      statusRow('HTTPS / secure context',
+        report.secureContext,
+        report.protocol + ' · isSecureContext=' + report.secureContext) +
+      statusRow('Not already running standalone',
+        !report.displayModeStandalone,
+        'display-mode standalone=' + report.displayModeStandalone,
+        report.displayModeStandalone) +
+      statusRow('beforeinstallprompt received',
+        report.beforeInstallPromptSeen,
+        report.beforeInstallPromptSeen
+          ? 'Chrome offered the install prompt.'
+          : 'Not received on this page yet.',
+        !report.beforeInstallPromptSeen) +
+      statusRow('User interaction recorded',
+        report.userTapped,
+        report.userTapped ? 'A tap/click was recorded.' : 'Tap anywhere on this page.',
+        !report.userTapped) +
+      statusRow('Time on debug page',
+        report.timeOnPageSeconds >= 30,
+        report.timeOnPageSeconds + ' seconds',
+        report.timeOnPageSeconds < 30);
+
+    document.getElementById('manifestChecks').innerHTML =
+      statusRow('Manifest link', !!m.linkPresent, m.href || 'missing') +
+      statusRow('Manifest fetched', !!m.fetchOk,
+        'HTTP ' + (m.httpStatus ?? 'n/a') + ' · ' + (m.contentType ?? 'no content-type')) +
+      statusRow('name / short_name', !!m.hasName,
+        m.parsed ? (m.parsed.name || m.parsed.short_name || 'missing') : 'not parsed') +
+      statusRow('start_url', !!m.hasStartUrl,
+        m.resolvedStartUrl || 'missing') +
+      statusRow('start_url inside scope', !!m.startWithinScope,
+        'scope=' + (m.resolvedScope || 'unknown')) +
+      statusRow('display mode', !!m.displayOk,
+        m.parsed ? String(m.parsed.display) : 'unknown') +
+      statusRow('prefer_related_applications', !!m.preferRelatedOk,
+        m.parsed ? String(m.parsed.prefer_related_applications) : 'not set') +
+      statusRow('192×192 icon declared', !!m.has192,
+        m.has192 ? 'present' : 'missing') +
+      statusRow('512×512 icon declared', !!m.has512,
+        m.has512 ? 'present' : 'missing');
+
+    document.getElementById('iconChecks').innerHTML =
+      report.icons.length
+        ? report.icons.map((i, idx) => {
+            const actual = i.actualWidth && i.actualHeight
+              ? i.actualWidth + '×' + i.actualHeight
+              : 'unknown';
+            const ok = i.fetchOk && i.square && i.actualMatchesDeclared;
+            return statusRow(
+              'Icon ' + (idx + 1) + ' · declared ' + i.declaredSizes,
+              ok,
+              actual + ' actual · HTTP ' + (i.httpStatus ?? 'n/a') +
+              ' · ' + (i.contentType || 'no content-type') +
+              ' · purpose=' + i.purpose
+            );
+          }).join('')
+        : statusRow('Icons', false, 'No icons found in manifest');
+
+    const sw = report.serviceWorker;
+    document.getElementById('swChecks').innerHTML =
+      statusRow('Service Worker API', !!sw.supported,
+        sw.supported ? 'supported' : 'not supported') +
+      (sw.supported ? statusRow(
+        'Registration found',
+        (sw.registrationCount || 0) > 0,
+        (sw.registrationCount || 0) + ' registration(s)'
+      ) : '') +
+      (sw.supported ? statusRow(
+        'Service worker ready',
+        !!sw.ready,
+        sw.ready ? (sw.readyScope || 'ready') : (sw.readyError || 'not ready'),
+        !sw.ready
+      ) : '') +
+      (sw.supported ? statusRow(
+        'Page controlled by service worker',
+        !!sw.controller,
+        sw.controller ? sw.controller.scriptURL : 'No controller on this page yet',
+        !sw.controller
+      ) : '');
+
+    document.getElementById('browserChecks').innerHTML =
+      statusRow('Online', report.online, String(report.online)) +
+      statusRow('Browser', true, report.userAgent) +
+      statusRow('Platform', true, report.platform || 'unknown') +
+      statusRow('Language', true, report.language || 'unknown');
+
+    document.getElementById('rawReport').textContent =
+      JSON.stringify(report, null, 2);
+  }
+
+  async function runChecks() {
+    try {
+      await checkManifest();
+      await checkServiceWorker();
+      await checkRelatedApps();
+    } catch (e) {
+      report.errors.push(String(e));
+    }
+    render();
+  }
+
+  document.getElementById('installBtn').addEventListener('click', async () => {
+    if (!window.__keepiInstallPrompt) return;
+    try {
+      const prompt = window.__keepiInstallPrompt;
+      window.__keepiInstallPrompt = null;
+      await prompt.prompt();
+      const choice = await prompt.userChoice;
+      report.installChoice = choice;
+      render();
+    } catch (e) {
+      report.installPromptError = String(e);
+      render();
+    }
+  });
+
+  document.getElementById('copyBtn').addEventListener('click', async () => {
+    render();
+    const text = document.getElementById('rawReport').textContent;
+    try {
+      await navigator.clipboard.writeText(text);
+      alert('Debug report copied.');
+    } catch (_) {
+      prompt('Copy this report:', text);
+    }
+  });
+
+  document.getElementById('rerunBtn').addEventListener('click', runChecks);
+  window.addEventListener('keepi-installability-changed', render);
+
+  if ('serviceWorker' in navigator) {
+    navigator.serviceWorker.register('/keepi-sw.js', { scope: '/' })
+      .then(() => runChecks())
+      .catch((e) => {
+        report.serviceWorker.registrationError = String(e);
+        runChecks();
+      });
+  } else {
+    runChecks();
+  }
+
+  setInterval(render, 5000);
+})();
+</script>
+</body>
+</html>
