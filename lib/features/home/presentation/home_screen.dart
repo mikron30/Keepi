@@ -6,21 +6,23 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
+    final theme = Theme.of(context);
+    final scheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
 
     return Scaffold(
       body: SafeArea(
         child: ListView(
-          padding: const EdgeInsets.fromLTRB(20, 18, 20, 30),
+          padding: const EdgeInsets.fromLTRB(18, 14, 18, 28),
           children: [
             Row(
               children: [
                 ClipRRect(
-                  borderRadius: BorderRadius.circular(14),
+                  borderRadius: BorderRadius.circular(15),
                   child: Image.asset(
                     'assets/images/keepi_icon.png',
-                    width: 54,
-                    height: 54,
+                    width: 52,
+                    height: 52,
                     fit: BoxFit.cover,
                   ),
                 ),
@@ -31,17 +33,17 @@ class HomeScreen extends StatelessWidget {
                     children: [
                       Text(
                         'Keepi',
-                        style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              fontWeight: FontWeight.w900,
-                              letterSpacing: -0.8,
-                            ),
+                        style: theme.textTheme.headlineMedium?.copyWith(
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: -0.8,
+                        ),
                       ),
                       Text(
                         'Your things. More value.',
-                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              color: scheme.onSurfaceVariant,
-                              fontWeight: FontWeight.w600,
-                            ),
+                        style: theme.textTheme.bodyMedium?.copyWith(
+                          color: scheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
                       ),
                     ],
                   ),
@@ -53,61 +55,94 @@ class HomeScreen extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 18),
             Container(
-              padding: const EdgeInsets.fromLTRB(22, 24, 22, 22),
               decoration: BoxDecoration(
                 borderRadius: BorderRadius.circular(28),
                 gradient: LinearGradient(
-                  colors: [
-                    scheme.primary,
-                    Color.lerp(scheme.primary, scheme.secondary, 0.28)!,
-                  ],
+                  colors: isDark
+                      ? const [
+                          Color(0xFF331710),
+                          Color(0xFF111827),
+                          Color(0xFF07111D),
+                        ]
+                      : const [
+                          Color(0xFFFFE3D6),
+                          Color(0xFFFFF5EF),
+                          Color(0xFFFFFBF8),
+                        ],
                   begin: Alignment.topLeft,
                   end: Alignment.bottomRight,
                 ),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    'Everything you own.\nOne place.',
-                    style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: scheme.onPrimary,
-                          fontWeight: FontWeight.w900,
-                          height: 1.06,
-                          letterSpacing: -0.8,
-                        ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Photograph it, let AI organize it, then keep it, sell it, '
-                    'rent it, lend it or share it.',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                          color: scheme.onPrimary.withValues(alpha: 0.88),
-                          height: 1.35,
-                        ),
-                  ),
-                  const SizedBox(height: 20),
-                  FilledButton.icon(
-                    onPressed: () => context.go('/add'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: Colors.white,
-                      foregroundColor: const Color(0xFF303A9F),
-                    ),
-                    icon: const Icon(Icons.camera_alt_outlined),
-                    label: const Text('Add a Thing'),
+                border: Border.all(
+                  color: scheme.primary.withValues(alpha: 0.45),
+                ),
+                boxShadow: [
+                  BoxShadow(
+                    color: scheme.primary.withValues(alpha: isDark ? 0.16 : 0.08),
+                    blurRadius: 28,
+                    spreadRadius: 1,
                   ),
                 ],
               ),
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 22, 20, 20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Text(
+                            'Scan it.\nOrganize it.\nUse it. Share it.',
+                            style: theme.textTheme.headlineMedium?.copyWith(
+                              fontWeight: FontWeight.w900,
+                              height: 1.02,
+                              letterSpacing: -0.9,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 14),
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(20),
+                          child: Image.asset(
+                            'assets/images/keepi_icon.png',
+                            width: 112,
+                            height: 112,
+                            fit: BoxFit.cover,
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      'Turn the things you already own into value — keep, sell, '
+                      'rent, lend, swap or give away.',
+                      style: theme.textTheme.bodyMedium?.copyWith(
+                        color: scheme.onSurfaceVariant,
+                        height: 1.35,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    SizedBox(
+                      width: double.infinity,
+                      child: FilledButton.icon(
+                        onPressed: () => context.go('/add'),
+                        icon: const Icon(Icons.camera_alt_outlined),
+                        label: const Text('Add a new item'),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 20),
             Text(
-              'What do you want to do?',
-              style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                    fontWeight: FontWeight.w900,
-                    letterSpacing: -0.3,
-                  ),
+              'Quick actions',
+              style: theme.textTheme.titleLarge?.copyWith(
+                fontWeight: FontWeight.w900,
+              ),
             ),
             const SizedBox(height: 12),
             GridView.count(
@@ -116,55 +151,45 @@ class HomeScreen extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 1.18,
+              childAspectRatio: 1.22,
               children: [
-                _LandingAction(
+                _HomeActionCard(
+                  icon: Icons.inventory_2_outlined,
+                  title: 'My Things',
+                  subtitle: 'Browse and manage your items',
+                  onTap: () => context.go('/things'),
+                ),
+                _HomeActionCard(
+                  icon: Icons.travel_explore_outlined,
+                  title: 'Explore',
+                  subtitle: 'Find things nearby',
+                  onTap: () => context.go('/explore'),
+                ),
+                _HomeActionCard(
                   icon: Icons.document_scanner_outlined,
                   title: 'Scan many',
                   subtitle: 'Shelf, fridge, tools and more',
-                  color: scheme.secondary,
-                  foreground: scheme.onSecondary,
                   onTap: () => context.push('/scan'),
                 ),
-                _LandingAction(
-                  icon: Icons.inventory_2_outlined,
-                  title: 'My Things',
-                  subtitle: 'Browse your folders and items',
-                  color: scheme.primaryContainer,
-                  foreground: scheme.onPrimaryContainer,
-                  onTap: () => context.go('/things'),
-                ),
-                _LandingAction(
-                  icon: Icons.travel_explore_outlined,
-                  title: 'Explore',
-                  subtitle: 'Find Things nearby',
-                  color: scheme.tertiaryContainer,
-                  foreground: scheme.onTertiaryContainer,
-                  onTap: () => context.go('/explore'),
-                ),
-                _LandingAction(
-                  icon: Icons.chat_bubble_outline,
+                _HomeActionCard(
+                  icon: Icons.forum_outlined,
                   title: 'Messages',
-                  subtitle: 'Talk with other Keepi users',
-                  color: scheme.surfaceContainerHighest,
-                  foreground: scheme.onSurface,
+                  subtitle: 'Chat with other users',
                   onTap: () => context.push('/messages'),
                 ),
+                _HomeActionCard(
+                  icon: Icons.sell_outlined,
+                  title: 'Sell & share',
+                  subtitle: 'Turn unused things into value',
+                  onTap: () => context.go('/things'),
+                ),
+                _HomeActionCard(
+                  icon: Icons.person_outline,
+                  title: 'Profile',
+                  subtitle: 'Locations, phone and settings',
+                  onTap: () => context.go('/profile'),
+                ),
               ],
-            ),
-            const SizedBox(height: 12),
-            _WideLandingButton(
-              icon: Icons.search,
-              title: 'Search nearby Things',
-              subtitle: 'Buy, rent, borrow, exchange or find free items',
-              onTap: () => context.go('/explore'),
-            ),
-            const SizedBox(height: 12),
-            _WideLandingButton(
-              icon: Icons.person_outline,
-              title: 'Profile & locations',
-              subtitle: 'Phone, home location, current location and settings',
-              onTap: () => context.go('/profile'),
             ),
           ],
         ),
@@ -173,117 +198,59 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
-class _LandingAction extends StatelessWidget {
-  const _LandingAction({
+class _HomeActionCard extends StatelessWidget {
+  const _HomeActionCard({
     required this.icon,
     required this.title,
     required this.subtitle,
-    required this.color,
-    required this.foreground,
     required this.onTap,
   });
 
   final IconData icon;
   final String title;
   final String subtitle;
-  final Color color;
-  final Color foreground;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
-    return Material(
-      color: color,
-      borderRadius: BorderRadius.circular(22),
-      clipBehavior: Clip.antiAlias,
+    final scheme = Theme.of(context).colorScheme;
+
+    return Card(
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(15),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: foreground, size: 30),
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: scheme.primary.withValues(alpha: 0.15),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                alignment: Alignment.center,
+                child: Icon(icon, color: scheme.primary, size: 25),
+              ),
               const Spacer(),
               Text(
                 title,
                 style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      color: foreground,
-                      fontWeight: FontWeight.w900,
-                    ),
+                  fontWeight: FontWeight.w900,
+                ),
               ),
-              const SizedBox(height: 4),
+              const SizedBox(height: 3),
               Text(
                 subtitle,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: foreground.withValues(alpha: 0.78),
-                      height: 1.25,
-                    ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-class _WideLandingButton extends StatelessWidget {
-  const _WideLandingButton({
-    required this.icon,
-    required this.title,
-    required this.subtitle,
-    required this.onTap,
-  });
-
-  final IconData icon;
-  final String title;
-  final String subtitle;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: InkWell(
-        borderRadius: BorderRadius.circular(22),
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              CircleAvatar(
-                radius: 24,
-                backgroundColor:
-                    Theme.of(context).colorScheme.primaryContainer,
-                foregroundColor:
-                    Theme.of(context).colorScheme.onPrimaryContainer,
-                child: Icon(icon),
-              ),
-              const SizedBox(width: 14),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      title,
-                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                            fontWeight: FontWeight.w800,
-                          ),
-                    ),
-                    const SizedBox(height: 3),
-                    Text(
-                      subtitle,
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color:
-                                Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                    ),
-                  ],
+                  color: scheme.onSurfaceVariant,
+                  height: 1.25,
                 ),
               ),
-              const Icon(Icons.arrow_forward_ios_rounded, size: 17),
             ],
           ),
         ),
