@@ -23,7 +23,8 @@
     window.keepiInstallPromptSeen = false;
 
     window.addEventListener('beforeinstallprompt', (event) => {
-      event.preventDefault();
+      // Let Chrome keep its native install UI/menu available.
+      // We only remember that installability was detected.
       window.keepiDeferredInstallPrompt = event;
       window.keepiInstallPromptSeen = true;
       window.dispatchEvent(new Event('keepi-install-ready'));
