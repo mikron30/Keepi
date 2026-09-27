@@ -145,13 +145,10 @@ class _ThingDetailScreenState extends State<ThingDetailScreen> {
           appBar: AppBar(
             title: Text(thing.name),
             actions: [
-              Padding(
-                padding: const EdgeInsets.only(right: 8),
-                child: IconButton.filled(
-                  tooltip: 'Edit Thing',
-                  onPressed: () => context.push('/things/${thing.id}/edit'),
-                  icon: const Icon(Icons.edit_outlined),
-                ),
+              IconButton(
+                tooltip: 'Edit Thing',
+                onPressed: () => context.push('/things/${thing.id}/edit'),
+                icon: const Icon(Icons.edit_outlined),
               ),
             ],
           ),
@@ -245,17 +242,16 @@ class _ThingDetailScreenState extends State<ThingDetailScreen> {
                 children: [
                   if (thing.enabledActions.isEmpty ||
                       thing.enabledActions.contains(ThingAction.personalUse))
-                    const _UsageBadge(
-                      icon: Icons.home_outlined,
-                      label: 'Personal use',
+                    const Chip(
+                      avatar: Icon(Icons.home_outlined, size: 18),
+                      label: Text('Personal use'),
                     ),
                   for (final action in thing.enabledActions.where(
                     (action) => action != ThingAction.personalUse,
                   ))
-                    _UsageBadge(
-                      icon: _actionIcon(action),
-                      label: _actionLabel(action),
-                      highlighted: true,
+                    Chip(
+                      avatar: Icon(_actionIcon(action), size: 18),
+                      label: Text(_actionLabel(action)),
                     ),
                 ],
               ),
@@ -486,57 +482,6 @@ class _InfoRow extends StatelessWidget {
           maxLines: 2,
           overflow: TextOverflow.ellipsis,
         ),
-      ),
-    );
-  }
-}
-
-
-class _UsageBadge extends StatelessWidget {
-  const _UsageBadge({
-    required this.icon,
-    required this.label,
-    this.highlighted = false,
-  });
-
-  final IconData icon;
-  final String label;
-  final bool highlighted;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 13, vertical: 11),
-      decoration: BoxDecoration(
-        color: highlighted
-            ? scheme.primary.withValues(alpha: 0.14)
-            : scheme.surfaceContainerHighest.withValues(alpha: 0.55),
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: highlighted
-              ? scheme.primary
-              : scheme.outlineVariant.withValues(alpha: 0.7),
-        ),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(
-            icon,
-            size: 18,
-            color: highlighted ? scheme.primary : scheme.onSurface,
-          ),
-          const SizedBox(width: 7),
-          Text(
-            label,
-            style: TextStyle(
-              color: highlighted ? scheme.primary : scheme.onSurface,
-              fontWeight: FontWeight.w700,
-            ),
-          ),
-        ],
       ),
     );
   }
