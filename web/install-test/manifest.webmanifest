@@ -1,0 +1,26 @@
+{
+  "name": "Keepi Install Test",
+  "short_name": "Keepi Test",
+  "id": "/install-test/",
+  "start_url": "/install-test/",
+  "scope": "/install-test/",
+  "display": "standalone",
+  "background_color": "#0D1020",
+  "theme_color": "#5865F2",
+  "description": "Minimal Keepi PWA installability test.",
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "/icons/keepi-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "/icons/keepi-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    }
+  ]
+}
