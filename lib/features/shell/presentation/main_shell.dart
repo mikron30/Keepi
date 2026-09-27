@@ -18,74 +18,38 @@ class MainShell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: navigationShell,
       bottomNavigationBar: NavigationBar(
         selectedIndex: navigationShell.currentIndex,
         onDestinationSelected: _goBranch,
-        destinations: [
-          const NavigationDestination(
+        destinations: const [
+          NavigationDestination(
             icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
+            selectedIcon: Icon(Icons.home),
             label: 'Home',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2_rounded),
+            selectedIcon: Icon(Icons.inventory_2),
             label: 'My Things',
           ),
           NavigationDestination(
-            icon: _AddNavIcon(
-              background: scheme.primary.withValues(alpha: 0.16),
-              foreground: scheme.primary,
-            ),
-            selectedIcon: _AddNavIcon(
-              background: scheme.primary,
-              foreground: scheme.onPrimary,
-            ),
+            icon: Icon(Icons.add_circle_outline, size: 31),
+            selectedIcon: Icon(Icons.add_circle, size: 31),
             label: 'Add',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.travel_explore_outlined),
             selectedIcon: Icon(Icons.travel_explore),
             label: 'Explore',
           ),
-          const NavigationDestination(
+          NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',
           ),
         ],
-      ),
-    );
-  }
-}
-
-class _AddNavIcon extends StatelessWidget {
-  const _AddNavIcon({
-    required this.background,
-    required this.foreground,
-  });
-
-  final Color background;
-  final Color foreground;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: 42,
-      height: 42,
-      decoration: BoxDecoration(
-        color: background,
-        shape: BoxShape.circle,
-      ),
-      alignment: Alignment.center,
-      child: Icon(
-        Icons.add,
-        color: foreground,
-        size: 28,
       ),
     );
   }
