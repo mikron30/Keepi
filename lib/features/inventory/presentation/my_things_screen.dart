@@ -22,21 +22,14 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('My Things'),
         actions: [
           IconButton(
-            tooltip: 'Search',
-            onPressed: () => context.go('/explore'),
-            icon: const Icon(Icons.search),
-          ),
-          IconButton(
             tooltip: 'Add a Thing',
             onPressed: () => context.go('/add'),
-            icon: const Icon(Icons.add_circle_outline),
+            icon: const Icon(Icons.add),
           ),
         ],
       ),
@@ -53,7 +46,9 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
 
           final things = snapshot.data!;
           if (things.isEmpty) {
-            return _EmptyState(onAdd: () => context.go('/add'));
+            return _EmptyState(
+              onAdd: () => context.go('/add'),
+            );
           }
 
           final grouped = <String, List<Thing>>{};
@@ -67,60 +62,39 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
             );
 
           return RefreshIndicator(
-            color: scheme.primary,
             onRefresh: () async {
               await Future<void>.delayed(const Duration(milliseconds: 300));
             },
             child: ListView(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 32),
+              padding: const EdgeInsets.fromLTRB(16, 10, 16, 32),
               children: [
                 Text(
-                  'Organized by category',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
+                  '${things.length} Things in ${categories.length} folders',
+                  style: Theme.of(context).textTheme.bodyMedium,
                 ),
-                const SizedBox(height: 8),
-                Text(
-                  '${things.length} Things · ${categories.length} folders',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: scheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  itemCount: categories.length,
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.93,
-                  ),
-                  itemBuilder: (context, index) {
-                    final categoryId = categories[index];
-                    final categoryThings = grouped[categoryId]!;
-
-                    return _CategoryFolderCard(
+                const SizedBox(height: 12),
+                ...categories.map((categoryId) {
+                  final categoryThings = grouped[categoryId]!;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: _CategoryFolderCard(
                       categoryId: categoryId,
                       things: categoryThings,
                       onTap: () => context.push(
                         '/things/category/${Uri.encodeComponent(categoryId)}',
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                }),
               ],
             ),
           );
         },
       ),
-      floatingActionButton: FloatingActionButton(
-        tooltip: 'Add a Thing',
+      floatingActionButton: FloatingActionButton.extended(
         onPressed: () => context.go('/add'),
-        child: const Icon(Icons.add),
+        icon: const Icon(Icons.camera_alt_outlined),
+        label: const Text('Add'),
       ),
     );
   }
@@ -134,7 +108,7 @@ class _MyThingsScreenState extends State<MyThingsScreen> {
       case 'tools':
         return 'Tools';
       case 'sports':
-        return 'Sports & Outdoor';
+        return 'Sports';
       case 'garden':
         return 'Garden';
       case 'electronics':
@@ -186,112 +160,124 @@ class _CategoryFolderCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final previewUrl = _previewUrl();
+    final previews = things
+        .map((thing) {
+          if (thing.thumbnailUrl?.trim().isNotEmpty == true) {
+            return thing.thumbnailUrl!.trim();
+          }
+          if (thing.photoUrls.isNotEmpty) {
+            return thing.photoUrls.first;
+          }
+          return null;
+        })
+        .whereType<String>()
+        .take(3)
+        .toList();
 
     return Card(
-      clipBehavior: Clip.antiAlias,
+      margin: EdgeInsets.zero,
       child: InkWell(
+        borderRadius: BorderRadius.circular(18),
         onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
-            Expanded(
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (previewUrl != null)
-                    Image.network(
-                      previewUrl,
-                      fit: BoxFit.cover,
-                      webHtmlElementStrategy:
-                          WebHtmlElementStrategy.fallback,
-                      errorBuilder: (_, _, _) => _FallbackPreview(
-                        categoryId: categoryId,
-                      ),
-                    )
-                  else
-                    _FallbackPreview(categoryId: categoryId),
-                  Positioned.fill(
-                    child: DecoratedBox(
-                      decoration: BoxDecoration(
-                        gradient: LinearGradient(
-                          colors: [
-                            Colors.transparent,
-                            Colors.black.withValues(alpha: 0.18),
-                          ],
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
+        child: Padding(
+          padding: const EdgeInsets.all(14),
+          child: Row(
+            children: [
+              _FolderPreview(
+                categoryId: categoryId,
+                previewUrls: previews,
               ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(12, 11, 9, 11),
-              child: Row(
-                children: [
-                  Container(
-                    width: 34,
-                    height: 34,
-                    decoration: BoxDecoration(
-                      color: scheme.primary.withValues(alpha: 0.14),
-                      borderRadius: BorderRadius.circular(11),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _MyThingsScreenState._categoryLabel(categoryId),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.w800,
+                          ),
                     ),
-                    alignment: Alignment.center,
-                    child: Icon(
-                      _categoryIcon(categoryId),
-                      size: 20,
-                      color: scheme.primary,
+                    const SizedBox(height: 4),
+                    Text(
+                      '${things.length} ${things.length == 1 ? 'Thing' : 'Things'}',
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
-                  ),
-                  const SizedBox(width: 9),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          _MyThingsScreenState._categoryLabel(categoryId),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style:
-                              Theme.of(context).textTheme.titleSmall?.copyWith(
-                                    fontWeight: FontWeight.w900,
-                                  ),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${things.length} ${things.length == 1 ? 'item' : 'items'}',
-                          style:
-                              Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: scheme.onSurfaceVariant,
-                                  ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, size: 20),
-                ],
+                  ],
+                ),
               ),
-            ),
-          ],
+              const Icon(Icons.chevron_right),
+            ],
+          ),
         ),
       ),
     );
   }
+}
 
-  String? _previewUrl() {
-    for (final thing in things) {
-      if (thing.thumbnailUrl?.trim().isNotEmpty == true) {
-        return thing.thumbnailUrl!.trim();
-      }
-      if (thing.photoUrls.isNotEmpty) {
-        return thing.photoUrls.first;
-      }
+class _FolderPreview extends StatelessWidget {
+  const _FolderPreview({
+    required this.categoryId,
+    required this.previewUrls,
+  });
+
+  final String categoryId;
+  final List<String> previewUrls;
+
+  @override
+  Widget build(BuildContext context) {
+    if (previewUrls.isEmpty) {
+      return Container(
+        width: 76,
+        height: 76,
+        decoration: BoxDecoration(
+          color: Theme.of(context).colorScheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Icon(
+          _categoryIcon(categoryId),
+          size: 36,
+        ),
+      );
     }
-    return null;
+
+    return SizedBox(
+      width: 76,
+      height: 76,
+      child: Stack(
+        children: [
+          for (var index = 0; index < previewUrls.length; index++)
+            Positioned(
+              left: index * 10,
+              top: index * 6,
+              child: Container(
+                width: 58,
+                height: 58,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: Theme.of(context).colorScheme.surface,
+                    width: 2,
+                  ),
+                ),
+                clipBehavior: Clip.antiAlias,
+                child: Image.network(
+                  previewUrls[index],
+                  fit: BoxFit.cover,
+                  webHtmlElementStrategy:
+                      WebHtmlElementStrategy.fallback,
+                  errorBuilder: (_, _, _) => ColoredBox(
+                    color: Theme.of(context)
+                        .colorScheme
+                        .surfaceContainerHighest,
+                    child: Icon(_categoryIcon(categoryId)),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
   }
 
   static IconData _categoryIcon(String value) {
@@ -299,7 +285,7 @@ class _CategoryFolderCard extends StatelessWidget {
       case 'books':
         return Icons.menu_book_outlined;
       case 'food':
-        return Icons.restaurant_outlined;
+        return Icons.kitchen_outlined;
       case 'drinks':
         return Icons.local_drink_outlined;
       case 'tools':
@@ -323,41 +309,10 @@ class _CategoryFolderCard extends StatelessWidget {
       case 'personal_care':
         return Icons.spa_outlined;
       case 'home':
-        return Icons.chair_outlined;
+        return Icons.home_outlined;
       default:
         return Icons.folder_outlined;
     }
-  }
-}
-
-class _FallbackPreview extends StatelessWidget {
-  const _FallbackPreview({required this.categoryId});
-
-  final String categoryId;
-
-  @override
-  Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-
-    return DecoratedBox(
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            scheme.primary.withValues(alpha: 0.18),
-            scheme.surfaceContainerHighest,
-          ],
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-        ),
-      ),
-      child: Center(
-        child: Icon(
-          _CategoryFolderCard._categoryIcon(categoryId),
-          color: scheme.primary,
-          size: 48,
-        ),
-      ),
-    );
   }
 }
 
@@ -379,13 +334,13 @@ class _EmptyState extends StatelessWidget {
             Text(
               'Nothing here yet',
               style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.w800,
+                    fontWeight: FontWeight.w700,
                   ),
             ),
             const SizedBox(height: 8),
             const Text(
-              'Photograph your first Thing and Keepi will organize it '
-              'automatically.',
+              'Photograph your first Thing and Keepi will file it '
+              'automatically in the right folder.',
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 20),
@@ -411,9 +366,23 @@ class _ErrorState extends StatelessWidget {
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
-        child: Text(
-          'Could not load My Things\n\n$message',
-          textAlign: TextAlign.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.cloud_off_outlined, size: 64),
+            const SizedBox(height: 16),
+            Text(
+              'Could not load My Things',
+              style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                  ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              message,
+              textAlign: TextAlign.center,
+            ),
+          ],
         ),
       ),
     );
