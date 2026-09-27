@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <meta name="theme-color" content="#5865F2">
+  <title>Keepi Install Test</title>
+  <link rel="manifest" href="/install-test/manifest.webmanifest">
+  <link rel="icon" href="/icons/keepi-192.png">
+  <style>
+    body{margin:0;background:#0D1020;color:#fff;font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;display:grid;place-items:center;min-height:100vh}
+    main{max-width:520px;padding:32px;text-align:center}
+    img{width:128px;height:128px;border-radius:28px}
+    h1{font-size:32px;margin:20px 0 8px}
+    p{color:#cfd3ff;line-height:1.5}
+    button{margin-top:18px;padding:14px 20px;border:0;border-radius:14px;background:#5865F2;color:#fff;font-size:18px;font-weight:800}
+    #status{margin-top:18px;font-size:14px;color:#ffcf70}
+  </style>
+</head>
+<body>
+<main>
+  <img src="/icons/keepi-192.png" alt="Keepi">
+  <h1>Keepi Install Test</h1>
+  <p>This is an isolated PWA on the same keepi.web.app domain.</p>
+  <button id="install" disabled>Install test app</button>
+  <div id="status">Waiting for Chrome install prompt…</div>
+</main>
+<script>
+let deferredPrompt = null;
+const button = document.getElementById('install');
+const status = document.getElementById('status');
+
+window.addEventListener('beforeinstallprompt', (event) => {
+  event.preventDefault();
+  deferredPrompt = event;
+  button.disabled = false;
+  status.textContent = 'Chrome says this test app is installable.';
+});
+
+window.addEventListener('appinstalled', () => {
+  status.textContent = 'Installed successfully.';
+  button.disabled = true;
+});
+
+button.addEventListener('click', async () => {
+  if (!deferredPrompt) return;
+  const prompt = deferredPrompt;
+  deferredPrompt = null;
+  await prompt.prompt();
+  const result = await prompt.userChoice;
+  status.textContent = 'Install choice: ' + result.outcome;
+  button.disabled = true;
+});
+
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/install-test/sw.js', {scope:'/install-test/'})
+    .then(() => status.textContent = 'Service worker ready. Waiting for Chrome install prompt…')
+    .catch((e) => status.textContent = 'Service worker error: ' + e);
+}
+</script>
+</body>
+</html>
