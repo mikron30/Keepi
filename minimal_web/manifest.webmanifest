@@ -1,23 +1,22 @@
 {
   "name": "Keepi",
   "short_name": "Keepi",
-  "id": "/keepi-install-test-v4",
-  "start_url": "/?source=keepi-pwa-v4",
+  "id": "/",
+  "start_url": "/",
   "scope": "/",
   "display": "standalone",
   "background_color": "#0D1020",
   "theme_color": "#5865F2",
-  "description": "Keepi clean PWA installability test v4.",
-  "prefer_related_applications": false,
+  "description": "Keepi PWA installability test v5",
   "icons": [
     {
-      "src": "/icons/icon-192.png?v=4",
+      "src": "/icons/icon-192.png?v=5",
       "sizes": "192x192",
       "type": "image/png",
       "purpose": "any"
     },
     {
-      "src": "/icons/icon-512.png?v=4",
+      "src": "/icons/icon-512.png?v=5",
       "sizes": "512x512",
       "type": "image/png",
       "purpose": "any"
