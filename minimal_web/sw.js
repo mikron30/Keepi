@@ -1,8 +1,5 @@
-const CACHE = 'keepi-pwa-v3';
-const CORE = [
-  '/',
-  '/index.html',
-  '/manifest.webmanifest',
+const CACHE = 'keepi-static-v4';
+const STATIC_ASSETS = [
   '/icons/icon-192.png',
   '/icons/icon-512.png'
 ];
@@ -10,7 +7,7 @@ const CORE = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(CORE))
+      .then((cache) => cache.addAll(STATIC_ASSETS))
       .then(() => self.skipWaiting())
   );
 });
@@ -28,23 +25,30 @@ self.addEventListener('activate', (event) => {
 self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
-  event.respondWith((async () => {
-    const cached = await caches.match(event.request, { ignoreSearch: true });
-    if (cached) return cached;
+  const url = new URL(event.request.url);
+  const isSameOrigin = url.origin === self.location.origin;
+  const isManifest = isSameOrigin && url.pathname === '/manifest.webmanifest';
+  const isNavigation = event.request.mode === 'navigate';
 
-    try {
-      const response = await fetch(event.request);
-      if (response && response.ok && new URL(event.request.url).origin === self.location.origin) {
-        const cache = await caches.open(CACHE);
-        cache.put(event.request, response.clone());
-      }
-      return response;
-    } catch (error) {
-      if (event.request.mode === 'navigate') {
-        const fallback = await caches.match('/index.html');
-        if (fallback) return fallback;
-      }
-      throw error;
-    }
-  })());
+  if (isNavigation || isManifest) {
+    event.respondWith(
+      fetch(event.request, { cache: 'no-store' })
+        .catch(() => caches.match('/'))
+    );
+    return;
+  }
+
+  if (isSameOrigin && url.pathname.startsWith('/icons/')) {
+    event.respondWith(
+      caches.match(event.request, { ignoreSearch: true }).then((cached) => {
+        if (cached) return cached;
+        return fetch(event.request).then((response) => {
+          if (response && response.ok) {
+            caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
+          }
+          return response;
+        });
+      })
+    );
+  }
 });
