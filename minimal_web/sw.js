@@ -1,5 +1,6 @@
-const CACHE = 'keepi-static-v4';
-const STATIC_ASSETS = [
+const CACHE = 'keepi-shell-v5';
+const SHELL = [
+  '/index.html',
   '/icons/icon-192.png',
   '/icons/icon-512.png'
 ];
@@ -7,7 +8,7 @@ const STATIC_ASSETS = [
 self.addEventListener('install', (event) => {
   event.waitUntil(
     caches.open(CACHE)
-      .then((cache) => cache.addAll(STATIC_ASSETS))
+      .then((cache) => cache.addAll(SHELL))
       .then(() => self.skipWaiting())
   );
 });
@@ -26,29 +27,29 @@ self.addEventListener('fetch', (event) => {
   if (event.request.method !== 'GET') return;
 
   const url = new URL(event.request.url);
-  const isSameOrigin = url.origin === self.location.origin;
-  const isManifest = isSameOrigin && url.pathname === '/manifest.webmanifest';
-  const isNavigation = event.request.mode === 'navigate';
+  if (url.origin !== self.location.origin) return;
 
-  if (isNavigation || isManifest) {
-    event.respondWith(
-      fetch(event.request, { cache: 'no-store' })
-        .catch(() => caches.match('/'))
-    );
+  if (url.pathname === '/manifest.webmanifest') {
+    event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
 
-  if (isSameOrigin && url.pathname.startsWith('/icons/')) {
-    event.respondWith(
-      caches.match(event.request, { ignoreSearch: true }).then((cached) => {
-        if (cached) return cached;
-        return fetch(event.request).then((response) => {
-          if (response && response.ok) {
-            caches.open(CACHE).then((cache) => cache.put(event.request, response.clone()));
-          }
-          return response;
-        });
-      })
-    );
+  if (event.request.mode === 'navigate') {
+    event.respondWith((async () => {
+      try {
+        return await fetch(event.request, { cache: 'no-store' });
+      } catch (_) {
+        return (await caches.match('/index.html')) || Response.error();
+      }
+    })());
+    return;
+  }
+
+  if (url.pathname.startsWith('/icons/')) {
+    event.respondWith((async () => {
+      const cached = await caches.match(event.request, { ignoreSearch: true });
+      if (cached) return cached;
+      return fetch(event.request);
+    })());
   }
 });
