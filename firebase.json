@@ -7,7 +7,7 @@
   },
   "hosting": {
     "target": "keepi-site",
-    "public": "build/web",
+    "public": "minimal_web",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -24,131 +24,7 @@
         ]
       },
       {
-        "source": "/flutter_bootstrap.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/main.dart.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/flutter_service_worker.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/reset.html",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          },
-          {
-            "key": "Clear-Site-Data",
-            "value": "\"cache\", \"storage\""
-          }
-        ]
-      },
-      {
-        "source": "/manifest.json",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/icons/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "public, max-age=3600"
-          }
-        ]
-      },
-      {
-        "source": "/keepi-sw.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          },
-          {
-            "key": "Service-Worker-Allowed",
-            "value": "/"
-          }
-        ]
-      },
-      {
-        "source": "/pwa-debug.html",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/keepi.webmanifest",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          },
-          {
-            "key": "Content-Type",
-            "value": "application/manifest+json; charset=utf-8"
-          }
-        ]
-      },
-      {
-        "source": "/install-test/**",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          }
-        ]
-      },
-      {
-        "source": "/install-test/manifest.webmanifest",
-        "headers": [
-          {
-            "key": "Content-Type",
-            "value": "application/manifest+json; charset=utf-8"
-          }
-        ]
-      },
-      {
-        "source": "/install-test/sw.js",
-        "headers": [
-          {
-            "key": "Cache-Control",
-            "value": "no-cache, no-store, must-revalidate"
-          },
-          {
-            "key": "Service-Worker-Allowed",
-            "value": "/install-test/"
-          }
-        ]
-      },
-      {
-        "source": "/app.webmanifest",
+        "source": "/manifest.webmanifest",
         "headers": [
           {
             "key": "Cache-Control",
