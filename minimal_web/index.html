@@ -4,99 +4,252 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1">
   <meta name="theme-color" content="#5865F2">
-  <meta name="description" content="Keepi minimal PWA baseline">
-  <title>Keepi</title>
-  <link rel="manifest" href="/manifest.webmanifest">
-  <link rel="icon" href="/icons/icon-192.png">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png">
+  <meta name="description" content="Keepi clean PWA installability test v2">
+  <title>Keepi PWA Test v2</title>
+  <link rel="manifest" href="/manifest.webmanifest?v=20260928-2">
+  <link rel="icon" href="/icons/icon-192.png?v=2">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png?v=2">
   <style>
     *{box-sizing:border-box}
     body{
       margin:0;
       min-height:100vh;
-      display:grid;
-      place-items:center;
       background:#0D1020;
       color:#fff;
       font-family:system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-serif;
     }
     main{
-      width:min(92vw,520px);
-      padding:32px;
+      width:min(94vw,560px);
+      margin:0 auto;
+      padding:28px 20px 48px;
       text-align:center;
     }
-    img{
-      width:128px;
-      height:128px;
-      border-radius:28px;
+    .logo{
+      width:104px;
+      height:104px;
+      border-radius:24px;
+      margin-top:8px;
     }
-    h1{
-      margin:20px 0 8px;
-      font-size:38px;
-    }
-    p{
-      margin:0;
-      color:#cfd3ff;
-      font-size:18px;
-      line-height:1.5;
-    }
+    h1{margin:16px 0 4px;font-size:36px}
+    .sub{margin:0;color:#cfd3ff;font-size:17px;line-height:1.4}
     button{
       width:100%;
-      margin-top:24px;
-      padding:16px 20px;
+      margin-top:18px;
+      padding:15px 18px;
       border:0;
       border-radius:14px;
       background:#5865F2;
       color:#fff;
-      font-size:19px;
+      font-size:18px;
       font-weight:800;
     }
-    button:disabled{
-      opacity:.45;
-    }
+    button.secondary{background:#272B45}
+    button:disabled{opacity:.4}
     #status{
-      margin-top:18px;
-      min-height:24px;
-      color:#ffcf70;
+      margin:16px 0 0;
+      min-height:46px;
+      padding:12px;
+      border-radius:12px;
+      background:#171A2C;
+      color:#ffda85;
       font-size:14px;
+      line-height:1.45;
+      text-align:left;
     }
-    #version{
-      margin-top:24px;
-      color:#7f89a9;
-      font-size:12px;
+    .panel{
+      margin-top:18px;
+      padding:14px;
+      border-radius:14px;
+      background:#111527;
+      text-align:left;
     }
+    .panel h2{margin:0 0 10px;font-size:18px}
+    .row{
+      display:flex;
+      gap:10px;
+      align-items:flex-start;
+      padding:8px 0;
+      border-top:1px solid #252A42;
+      font-size:13px;
+      line-height:1.35;
+    }
+    .row:first-of-type{border-top:0}
+    .mark{width:22px;flex:0 0 22px;font-weight:900}
+    .ok{color:#74e39a}
+    .bad{color:#ff8f8f}
+    .wait{color:#ffda85}
+    .name{font-weight:700}
+    .detail{color:#aeb6d8;word-break:break-word}
+    #version{margin-top:18px;color:#7f89a9;font-size:12px}
   </style>
 </head>
 <body>
 <main>
-  <img src="/icons/icon-192.png" alt="Keepi">
+  <img class="logo" src="/icons/icon-192.png?v=2" alt="Keepi">
   <h1>Keepi</h1>
-  <p>Minimal installable baseline.</p>
+  <p class="sub">Clean PWA install test v2</p>
+
   <button id="install" disabled>Install Keepi</button>
-  <div id="status">Preparing install…</div>
-  <div id="version">baseline-v1</div>
+  <button id="refresh" class="secondary">Refresh diagnostics</button>
+
+  <div id="status">Starting PWA checks…</div>
+
+  <section class="panel">
+    <h2>PWA diagnostics</h2>
+    <div id="checks"></div>
+  </section>
+
+  <div id="version">keepi-pwa-v2 / 2026-09-28</div>
 </main>
 
 <script>
 let deferredPrompt = null;
 const installButton = document.getElementById('install');
-const status = document.getElementById('status');
+const refreshButton = document.getElementById('refresh');
+const statusBox = document.getElementById('status');
+const checks = document.getElementById('checks');
+
+const state = new Map();
+
+function setCheck(key, name, result, detail) {
+  state.set(key, {name, result, detail});
+  renderChecks();
+}
+
+function renderChecks() {
+  checks.innerHTML = '';
+  for (const item of state.values()) {
+    const row = document.createElement('div');
+    row.className = 'row';
+
+    const mark = document.createElement('div');
+    mark.className = 'mark ' + (item.result === true ? 'ok' : item.result === false ? 'bad' : 'wait');
+    mark.textContent = item.result === true ? 'OK' : item.result === false ? 'X' : '…';
+
+    const text = document.createElement('div');
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = item.name;
+
+    const detail = document.createElement('div');
+    detail.className = 'detail';
+    detail.textContent = item.detail || '';
+
+    text.appendChild(name);
+    text.appendChild(detail);
+    row.appendChild(mark);
+    row.appendChild(text);
+    checks.appendChild(row);
+  }
+}
+
+async function checkImage(src, expectedSize, key) {
+  return new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const ok = img.naturalWidth === expectedSize && img.naturalHeight === expectedSize;
+      setCheck(key, 'Icon ' + expectedSize + 'x' + expectedSize, ok,
+        img.naturalWidth + 'x' + img.naturalHeight + ' loaded from ' + src);
+      resolve(ok);
+    };
+    img.onerror = () => {
+      setCheck(key, 'Icon ' + expectedSize + 'x' + expectedSize, false, 'Could not load ' + src);
+      resolve(false);
+    };
+    img.src = src + '&t=' + Date.now();
+  });
+}
+
+async function runDiagnostics() {
+  statusBox.textContent = deferredPrompt
+    ? 'Chrome has supplied an install prompt. The Install Keepi button is ready.'
+    : 'Checks are running. If all checks are OK but Install stays disabled, Chrome itself is withholding beforeinstallprompt.';
+
+  setCheck('https', 'HTTPS', location.protocol === 'https:', location.href);
+
+  try {
+    const response = await fetch('/manifest.webmanifest?v=20260928-2&t=' + Date.now(), {cache:'no-store'});
+    const manifest = await response.json();
+    const required =
+      !!(manifest.name || manifest.short_name) &&
+      !!manifest.start_url &&
+      ['fullscreen','standalone','minimal-ui','window-controls-overlay'].includes(manifest.display) &&
+      manifest.prefer_related_applications !== true &&
+      Array.isArray(manifest.icons) &&
+      manifest.icons.some(i => String(i.sizes).includes('192x192')) &&
+      manifest.icons.some(i => String(i.sizes).includes('512x512'));
+
+    setCheck(
+      'manifest',
+      'Manifest',
+      response.ok && required,
+      'HTTP ' + response.status +
+      ' | id=' + manifest.id +
+      ' | start_url=' + manifest.start_url +
+      ' | display=' + manifest.display
+    );
+  } catch (e) {
+    setCheck('manifest', 'Manifest', false, String(e));
+  }
+
+  await checkImage('/icons/icon-192.png?v=2', 192, 'icon192');
+  await checkImage('/icons/icon-512.png?v=2', 512, 'icon512');
+
+  if ('serviceWorker' in navigator) {
+    try {
+      const reg = await navigator.serviceWorker.register('/sw.js?v=20260928-2', {scope:'/'});
+      await navigator.serviceWorker.ready;
+      await new Promise(r => setTimeout(r, 300));
+      setCheck(
+        'sw',
+        'Service worker',
+        true,
+        'registered scope=' + reg.scope + ' | controller=' + (navigator.serviceWorker.controller ? 'yes' : 'not yet')
+      );
+    } catch (e) {
+      setCheck('sw', 'Service worker', false, String(e));
+    }
+  } else {
+    setCheck('sw', 'Service worker', false, 'Not supported by this browser');
+  }
+
+  setCheck(
+    'standalone',
+    'Already running standalone',
+    null,
+    window.matchMedia('(display-mode: standalone)').matches ? 'yes' : 'no'
+  );
+
+  setCheck(
+    'prompt',
+    'beforeinstallprompt',
+    deferredPrompt ? true : null,
+    deferredPrompt ? 'Chrome fired the event' : 'Not received yet'
+  );
+
+  setCheck('ua', 'Browser', null, navigator.userAgent);
+}
 
 window.addEventListener('beforeinstallprompt', (event) => {
   event.preventDefault();
   deferredPrompt = event;
   installButton.disabled = false;
-  status.textContent = 'Chrome says Keepi is installable.';
+  statusBox.textContent = 'READY: Chrome says this PWA is installable. Tap Install Keepi.';
+  setCheck('prompt', 'beforeinstallprompt', true, 'Chrome fired the event');
 });
 
 window.addEventListener('appinstalled', () => {
   deferredPrompt = null;
   installButton.disabled = true;
-  status.textContent = 'Keepi installed successfully.';
+  statusBox.textContent = 'Keepi installed successfully.';
+  setCheck('installed', 'appinstalled', true, 'Installation event received');
 });
 
 installButton.addEventListener('click', async () => {
-  if (!deferredPrompt) return;
+  if (!deferredPrompt) {
+    statusBox.textContent = 'No Chrome install prompt is available yet.';
+    return;
+  }
 
   const promptEvent = deferredPrompt;
   deferredPrompt = null;
@@ -104,23 +257,27 @@ installButton.addEventListener('click', async () => {
 
   await promptEvent.prompt();
   const choice = await promptEvent.userChoice;
-  status.textContent = 'Install choice: ' + choice.outcome;
+  statusBox.textContent = 'Chrome install result: ' + choice.outcome;
+  setCheck('choice', 'Install result', choice.outcome === 'accepted', choice.outcome);
 });
 
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/sw.js', { scope: '/' })
-    .then(() => navigator.serviceWorker.ready)
-    .then(() => {
-      if (!deferredPrompt) {
-        status.textContent = 'Service worker ready. Waiting for Chrome install prompt…';
-      }
-    })
-    .catch((error) => {
-      status.textContent = 'Service worker error: ' + error;
-    });
-} else {
-  status.textContent = 'Service workers are not supported in this browser.';
-}
+refreshButton.addEventListener('click', runDiagnostics);
+
+let seconds = 0;
+const timer = setInterval(() => {
+  seconds++;
+  if (!deferredPrompt && seconds === 35) {
+    statusBox.textContent = '35 seconds passed and Chrome still did not fire beforeinstallprompt. Send a screenshot of the diagnostics below.';
+    setCheck('prompt', 'beforeinstallprompt', null, 'Not received after 35 seconds on this page');
+    clearInterval(timer);
+  }
+}, 1000);
+
+document.addEventListener('pointerdown', () => {
+  setCheck('tap', 'Page interaction', true, 'Tap/click detected');
+}, {once:true});
+
+runDiagnostics();
 </script>
 </body>
 </html>
