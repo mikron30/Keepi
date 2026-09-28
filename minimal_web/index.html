@@ -6,9 +6,9 @@
   <meta name="theme-color" content="#5865F2">
   <meta name="description" content="Keepi clean PWA installability test v2">
   <title>Keepi PWA Test v2</title>
-  <link rel="manifest" href="/manifest.webmanifest?v=20260928-3">
-  <link rel="icon" href="/icons/icon-192.png?v=2">
-  <link rel="apple-touch-icon" href="/icons/icon-192.png?v=2">
+  <link rel="manifest" href="/manifest.webmanifest?v=40260928-4">
+  <link rel="icon" href="/icons/icon-192.png?v=4">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png?v=4">
   <style>
     *{box-sizing:border-box}
     body{
@@ -85,9 +85,9 @@
 </head>
 <body>
 <main>
-  <img class="logo" src="/icons/icon-192.png?v=2" alt="Keepi">
+  <img class="logo" src="/icons/icon-192.png?v=4" alt="Keepi">
   <h1>Keepi</h1>
-  <p class="sub">Clean PWA install test v3</p>
+  <p class="sub">Clean PWA install test v4</p>
 
   <button id="install" disabled>Install Keepi</button>
   <button id="refresh" class="secondary">Refresh diagnostics</button>
@@ -99,7 +99,7 @@
     <div id="checks"></div>
   </section>
 
-  <div id="version">keepi-pwa-v3 / 2026-09-28</div>
+  <div id="version">keepi-pwa-v4 / 2026-09-28</div>
 </main>
 
 <script>
@@ -168,7 +168,7 @@ async function runDiagnostics() {
   setCheck('https', 'HTTPS', location.protocol === 'https:', location.href);
 
   try {
-    const response = await fetch('/manifest.webmanifest?v=20260928-3&t=' + Date.now(), {cache:'no-store'});
+    const response = await fetch('/manifest.webmanifest?v=40260928-4&t=' + Date.now(), {cache:'no-store'});
     const manifest = await response.json();
     const required =
       !!(manifest.name || manifest.short_name) &&
@@ -192,12 +192,12 @@ async function runDiagnostics() {
     setCheck('manifest', 'Manifest', false, String(e));
   }
 
-  await checkImage('/icons/icon-192.png?v=2', 192, 'icon192');
-  await checkImage('/icons/icon-512.png?v=2', 512, 'icon512');
+  await checkImage('/icons/icon-192.png?v=4', 192, 'icon192');
+  await checkImage('/icons/icon-512.png?v=4', 512, 'icon512');
 
   if ('serviceWorker' in navigator) {
     try {
-      const reg = await navigator.serviceWorker.register('/sw.js?v=20260928-3', {scope:'/'});
+      const reg = await navigator.serviceWorker.register('/sw.js?v=40260928-4', {scope:'/'});
       await navigator.serviceWorker.ready;
       await new Promise(r => setTimeout(r, 300));
       setCheck(
