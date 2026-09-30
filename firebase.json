@@ -24,7 +24,7 @@
         ]
       },
       {
-        "source": "/app/manifest.webmanifest",
+        "source": "/app/manifest.json",
         "headers": [
           {
             "key": "Cache-Control",
