@@ -220,6 +220,23 @@ if ($LASTEXITCODE -ne 0) {
     throw "Flutter Web build failed."
 }
 
+$requiredWebFiles = @(
+    "manifest.json",
+    "icons\Icon-192.png",
+    "icons\Icon-512.png",
+    "sw.js",
+    "index.html"
+)
+
+foreach ($relativeFile in $requiredWebFiles) {
+    $builtFile = Join-Path (Join-Path $ProjectPath "build\web") $relativeFile
+    if (-not (Test-Path $builtFile)) {
+        throw "PWA build verification failed: missing build\web\$relativeFile"
+    }
+}
+
+Write-Host "PWA build verification passed: manifest.json, icons, service worker and index are present." -ForegroundColor Green
+
 $hostingRoot = Join-Path $ProjectPath "hosting_web"
 $appHostingPath = Join-Path $hostingRoot "app"
 
