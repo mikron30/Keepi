@@ -86,7 +86,7 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
     try {
         foreach ($size in @(192, 512)) {
             $targetPath = Join-Path $iconsPath "Icon-$size.png"
-            $bitmap = New-Object System.Drawing.Bitmap(
+            $bitmap = [System.Drawing.Bitmap]::new(
                 $size,
                 $size,
                 [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
