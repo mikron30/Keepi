@@ -1,4 +1,4 @@
-const CACHE = 'keepi-app-shell-v2';
+const CACHE = 'keepi-app-shell-v3';
 const SHELL = [
   '/app/',
   '/app/index.html',
@@ -30,7 +30,7 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname === '/app/manifest.webmanifest') {
+  if (url.pathname === '/app/manifest.json') {
     event.respondWith(fetch(event.request, { cache: 'no-store' }));
     return;
   }
