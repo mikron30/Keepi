@@ -69,6 +69,62 @@ function Require-Command([string]$Name, [string]$HelpText) {
     }
 }
 
+function Write-KeepiPwaIcons([string]$RepoPath) {
+    $sourcePath = Join-Path $RepoPath "assets\images\keepi_icon.png"
+    $iconsPath = Join-Path $RepoPath "build\web\icons"
+
+    if (-not (Test-Path $sourcePath)) {
+        throw "Missing Keepi app icon: assets\images\keepi_icon.png"
+    }
+
+    Add-Type -AssemblyName System.Drawing
+
+    New-Item -ItemType Directory -Force -Path $iconsPath | Out-Null
+
+    $source = [System.Drawing.Image]::FromFile($sourcePath)
+
+    try {
+        foreach ($size in @(192, 512)) {
+            $targetPath = Join-Path $iconsPath "Icon-$size.png"
+            $bitmap = New-Object System.Drawing.Bitmap(
+                $size,
+                $size,
+                [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
+            )
+            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
+
+            try {
+                $graphics.Clear([System.Drawing.Color]::Transparent)
+                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
+                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
+                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
+                $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
+                $graphics.DrawImage($source, 0, 0, $size, $size)
+                $bitmap.Save($targetPath, [System.Drawing.Imaging.ImageFormat]::Png)
+            }
+            finally {
+                $graphics.Dispose()
+                $bitmap.Dispose()
+            }
+
+            $check = [System.Drawing.Image]::FromFile($targetPath)
+            try {
+                if ($check.Width -ne $size -or $check.Height -ne $size) {
+                    throw "Generated Keepi icon has wrong dimensions: $targetPath"
+                }
+            }
+            finally {
+                $check.Dispose()
+            }
+        }
+    }
+    finally {
+        $source.Dispose()
+    }
+
+    Write-Host "Generated branded Keepi PWA icons (192x192 and 512x512) as non-indexed PNG files." -ForegroundColor Green
+}
+
 function Deploy-FunctionsWithRetry([string]$ProjectId) {
     $maxAttempts = 3
 
@@ -160,7 +216,7 @@ function Resolve-HostingSite([string]$ProjectId, [string]$RepoPath) {
 }
 
 Write-Host ""
-Write-Host "Keepi - Publish installable Flutter Web under /app/" -ForegroundColor Green
+Write-Host "Keepi - Publish production installable app" -ForegroundColor Green
 
 Require-Command "git.exe" "Install Git for Windows."
 Require-Command "flutter.bat" "Install Flutter and make sure it is in PATH."
@@ -220,6 +276,10 @@ if ($LASTEXITCODE -ne 0) {
     throw "Flutter Web build failed."
 }
 
+Write-Host ""
+Write-Host "Applying Keepi branding to the installable app icon..." -ForegroundColor Cyan
+Write-KeepiPwaIcons -RepoPath $ProjectPath
+
 $requiredWebFiles = @(
     "manifest.json",
     "icons\Icon-192.png",
@@ -236,7 +296,7 @@ foreach ($relativeFile in $requiredWebFiles) {
     }
 }
 
-Write-Host "PWA build verification passed: manifest.json, icons, service worker and index are present." -ForegroundColor Green
+Write-Host "Production PWA verification passed: manifest, branded icons, service worker and app shell are present." -ForegroundColor Green
 
 $hostingRoot = Join-Path $ProjectPath "hosting_web"
 $appHostingPath = Join-Path $hostingRoot "app"
@@ -251,7 +311,7 @@ Copy-Item -Path (Join-Path $ProjectPath "build\web\*") -Destination $appHostingP
 $versionText = "Keepi commit: $commitId`nPublished: $(Get-Date -Format o)"
 Set-Content -Path (Join-Path $appHostingPath "keepi-version.txt") -Value $versionText -Encoding ascii
 
-Write-Host "Prepared installable Keepi at /app/." -ForegroundColor Green
+Write-Host "Prepared production Keepi app at /app/." -ForegroundColor Green
 
 Write-Host ""
 Write-Host "Checking Keepi Cloud Function syntax..." -ForegroundColor Cyan
