@@ -7,7 +7,7 @@
   },
   "hosting": {
     "target": "keepi-site",
-    "public": "minimal_web",
+    "public": "hosting_web",
     "ignore": [
       "firebase.json",
       "**/.*",
@@ -15,7 +15,7 @@
     ],
     "headers": [
       {
-        "source": "/index.html",
+        "source": "/app/index.html",
         "headers": [
           {
             "key": "Cache-Control",
@@ -24,7 +24,7 @@
         ]
       },
       {
-        "source": "/manifest.webmanifest",
+        "source": "/app/manifest.webmanifest",
         "headers": [
           {
             "key": "Cache-Control",
@@ -37,7 +37,7 @@
         ]
       },
       {
-        "source": "/sw.js",
+        "source": "/app/sw.js",
         "headers": [
           {
             "key": "Cache-Control",
@@ -45,15 +45,40 @@
           },
           {
             "key": "Service-Worker-Allowed",
-            "value": "/"
+            "value": "/app/"
+          }
+        ]
+      },
+      {
+        "source": "/app/flutter_bootstrap.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
+          }
+        ]
+      },
+      {
+        "source": "/app/main.dart.js",
+        "headers": [
+          {
+            "key": "Cache-Control",
+            "value": "no-cache, no-store, must-revalidate"
           }
         ]
       }
     ],
     "rewrites": [
       {
-        "source": "**",
-        "destination": "/index.html"
+        "source": "/app/**",
+        "destination": "/app/index.html"
+      }
+    ],
+    "redirects": [
+      {
+        "source": "/",
+        "destination": "/app/",
+        "type": 302
       }
     ]
   },
