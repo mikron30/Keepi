@@ -70,7 +70,7 @@ async function run(){
     const appScope=new URL('/app/',location.origin).href;
     await Promise.all(oldRegs.filter(r=>r.scope!==appScope).map(r=>r.unregister()));
 
-    const reg=await navigator.serviceWorker.register('/app/sw.js?v=4',{scope:'/app/',updateViaCache:'none'});
+    const reg=await navigator.serviceWorker.register('/app/sw.js?v=5',{scope:'/app/',updateViaCache:'none'});
     row('Register /app/sw.js',true,'scope='+reg.scope);
 
     await reg.update();
