@@ -1,4 +1,4 @@
-const CACHE = 'keepi-app-runtime-v4';
+const CACHE = 'keepi-app-runtime-v5';
 
 self.addEventListener('install', (event) => {
   // Never let optional precaching prevent the worker from installing.
