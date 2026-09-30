@@ -225,7 +225,8 @@ $requiredWebFiles = @(
     "icons\Icon-192.png",
     "icons\Icon-512.png",
     "sw.js",
-    "index.html"
+    "index.html",
+    "pwa-debug.html"
 )
 
 foreach ($relativeFile in $requiredWebFiles) {
