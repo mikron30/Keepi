@@ -12,11 +12,11 @@
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
   <meta name="apple-mobile-web-app-title" content="Keepi">
-  <link rel="apple-touch-icon" href="/assets/assets/images/keepi_icon.png">
-  <link rel="icon" type="image/png" href="/assets/assets/images/keepi_icon.png">
+  <link rel="apple-touch-icon" href="icons/keepi-192.png">
+  <link rel="icon" type="image/png" href="icons/keepi-192.png">
 
   <title>Keepi</title>
-  <link rel="manifest" href="/app.webmanifest">
+  <link rel="manifest" href="manifest.webmanifest">
 
   <style>
     #keepi-install-button {
@@ -30,21 +30,16 @@
       padding: 14px 22px;
       border: 0;
       border-radius: 999px;
-      background: #FF634D;
+      background: #5865F2;
       color: #ffffff;
       font: 700 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
       box-shadow: 0 10px 30px rgba(0, 0, 0, .28);
       cursor: pointer;
     }
-
-    #keepi-install-button:active {
-      transform: translateX(-50%) scale(.98);
-    }
   </style>
 
   <script>
     window.keepiDeferredInstallPrompt = null;
-    window.keepiInstallPromptSeen = false;
 
     function keepiIsStandalone() {
       return window.matchMedia('(display-mode: standalone)').matches ||
@@ -54,7 +49,6 @@
     function keepiRefreshInstallButton() {
       const button = document.getElementById('keepi-install-button');
       if (!button) return;
-
       button.style.display =
         window.keepiDeferredInstallPrompt && !keepiIsStandalone()
           ? 'block'
@@ -62,47 +56,36 @@
     }
 
     window.addEventListener('beforeinstallprompt', (event) => {
-      // Use the same flow that succeeded on the PWA debug page:
-      // save Chrome's install event and invoke it from our own button.
       event.preventDefault();
       window.keepiDeferredInstallPrompt = event;
-      window.keepiInstallPromptSeen = true;
       keepiRefreshInstallButton();
-      window.dispatchEvent(new Event('keepi-install-ready'));
     });
 
     window.addEventListener('appinstalled', () => {
       window.keepiDeferredInstallPrompt = null;
       keepiRefreshInstallButton();
-      window.dispatchEvent(new Event('keepi-app-installed'));
     });
 
     window.addEventListener('DOMContentLoaded', () => {
       const button = document.getElementById('keepi-install-button');
-
       if (button) {
         button.addEventListener('click', async () => {
           const prompt = window.keepiDeferredInstallPrompt;
           if (!prompt) return;
-
           window.keepiDeferredInstallPrompt = null;
           keepiRefreshInstallButton();
-
-          try {
-            await prompt.prompt();
-            await prompt.userChoice;
-          } catch (error) {
-            console.warn('Keepi install prompt failed:', error);
-          }
+          await prompt.prompt();
+          await prompt.userChoice;
         });
       }
-
       keepiRefreshInstallButton();
     });
 
     if ('serviceWorker' in navigator) {
       window.addEventListener('load', () => {
-        navigator.serviceWorker.register('/sw.js', { scope: '/' })
+        const scopeUrl = new URL('./', document.baseURI);
+        const swUrl = new URL('sw.js', document.baseURI);
+        navigator.serviceWorker.register(swUrl.pathname, { scope: scopeUrl.pathname })
           .catch((error) => {
             console.warn('Keepi service worker registration failed:', error);
           });
