@@ -1,9 +1,9 @@
-const CACHE = 'keepi-app-shell-v1';
+const CACHE = 'keepi-app-shell-v2';
 const SHELL = [
   '/app/',
   '/app/index.html',
-  '/app/icons/keepi-192.png',
-  '/app/icons/keepi-512.png'
+  '/app/icons/Icon-192.png',
+  '/app/icons/Icon-512.png'
 ];
 
 self.addEventListener('install', (event) => {
