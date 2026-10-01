@@ -27,9 +27,6 @@ jobs:
       - name: Analyze
         run: flutter analyze
 
-      - name: Generate PWA icons
-        run: dart run tool/generate_pwa_icons.dart
-
       - name: Test
         run: flutter test
 
