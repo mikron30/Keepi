@@ -82,10 +82,22 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
     New-Item -ItemType Directory -Force -Path $iconsPath | Out-Null
 
     $source = [System.Drawing.Image]::FromFile($sourcePath)
+    $background = [System.Drawing.Color]::FromArgb(255, 7, 17, 29)
 
     try {
-        foreach ($size in @(192, 512)) {
-            $targetPath = Join-Path $iconsPath "Icon-$size.png"
+        $specs = @(
+            @{ Name = "Icon-192.png"; Size = 192; InsetRatio = 0.00 },
+            @{ Name = "Icon-512.png"; Size = 512; InsetRatio = 0.00 },
+            @{ Name = "Icon-maskable-192.png"; Size = 192; InsetRatio = 0.12 },
+            @{ Name = "Icon-maskable-512.png"; Size = 512; InsetRatio = 0.12 }
+        )
+
+        foreach ($spec in $specs) {
+            $size = [int]$spec.Size
+            $targetPath = Join-Path $iconsPath $spec.Name
+            $inset = [int][Math]::Round($size * [double]$spec.InsetRatio)
+            $available = $size - (2 * $inset)
+
             $bitmap = [System.Drawing.Bitmap]::new(
                 $size,
                 $size,
@@ -94,12 +106,28 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
             $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
 
             try {
-                $graphics.Clear([System.Drawing.Color]::Transparent)
+                # Use an opaque Keepi navy canvas so Android launchers never
+                # substitute an odd background around transparent pixels.
+                $graphics.Clear($background)
                 $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
                 $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
                 $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
                 $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-                $graphics.DrawImage($source, 0, 0, $size, $size)
+
+                $sourceRatio = [double]$source.Width / [double]$source.Height
+                if ($sourceRatio -ge 1.0) {
+                    $drawWidth = $available
+                    $drawHeight = [int][Math]::Round($available / $sourceRatio)
+                }
+                else {
+                    $drawHeight = $available
+                    $drawWidth = [int][Math]::Round($available * $sourceRatio)
+                }
+
+                $x = [int][Math]::Round(($size - $drawWidth) / 2.0)
+                $y = [int][Math]::Round(($size - $drawHeight) / 2.0)
+
+                $graphics.DrawImage($source, $x, $y, $drawWidth, $drawHeight)
                 $bitmap.Save($targetPath, [System.Drawing.Imaging.ImageFormat]::Png)
             }
             finally {
@@ -122,7 +150,7 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
         $source.Dispose()
     }
 
-    Write-Host "Generated branded Keepi PWA icons (192x192 and 512x512) as non-indexed PNG files." -ForegroundColor Green
+    Write-Host "Generated branded Keepi PWA icons: standard + Android maskable (192x192 and 512x512)." -ForegroundColor Green
 }
 
 function Deploy-FunctionsWithRetry([string]$ProjectId) {
