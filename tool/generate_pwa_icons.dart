@@ -1,5 +1,6 @@
 // ignore_for_file: prefer_interpolation_to_compose_strings
 
+import 'dart:convert';
 import 'dart:io';
 import 'package:image/image.dart' as img;
 
@@ -53,14 +54,16 @@ void _verify(String path, int expectedSize) {
 }
 
 void main() {
-  final sourceFile = File('assets/images/keepi_icon.png');
+  final sourceFile = File('assets/images/keepi_icon_clean.webp.b64');
   if (!sourceFile.existsSync()) {
-    throw StateError('Missing assets/images/keepi_icon.png');
+    throw StateError('Missing assets/images/keepi_icon_clean.webp.b64');
   }
 
-  final source = img.decodeImage(sourceFile.readAsBytesSync());
+  final encoded = sourceFile.readAsStringSync().replaceAll(RegExp(r'\\s+'), '');
+  final sourceBytes = base64Decode(encoded);
+  final source = img.decodeImage(sourceBytes);
   if (source == null) {
-    throw StateError('Could not decode approved Keepi icon.');
+    throw StateError('Could not decode clean approved Keepi icon.');
   }
 
   if (source.width != source.height) {
