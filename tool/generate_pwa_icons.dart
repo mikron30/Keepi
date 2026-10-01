@@ -1,7 +1,9 @@
+// ignore_for_file: prefer_interpolation_to_compose_strings
+
 import 'dart:io';
 import 'package:image/image.dart' as img;
 
-const navy = img.ColorRgb8(7, 17, 29);
+final navy = img.ColorRgb8(7, 17, 29);
 
 img.Image _opaqueCanvas(int size) {
   final canvas = img.Image(width: size, height: size, numChannels: 3);
