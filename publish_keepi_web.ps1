@@ -77,6 +77,13 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
         throw "Missing Keepi app icon: assets\images\keepi_icon.png"
     }
 
+    # Lock publishing to the approved piggy-bank/house Keepi artwork.
+    $approvedIconGitBlob = "e27c172bbd539a4563db3b3c265320d6e185c80d"
+    $actualIconGitBlob = (git hash-object -- "assets/images/keepi_icon.png").Trim()
+    if ($actualIconGitBlob -ne $approvedIconGitBlob) {
+        throw "Approved Keepi icon source changed unexpectedly. Refusing to publish a fallback icon."
+    }
+
     Add-Type -AssemblyName System.Drawing
 
     New-Item -ItemType Directory -Force -Path $iconsPath | Out-Null
@@ -148,6 +155,21 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
     }
     finally {
         $source.Dispose()
+    }
+
+    # These are the checked-in Flutter template icon blobs. They must never
+    # survive into a production Keepi build.
+    $flutterTemplateBlobs = @(
+        "b749bfef07473333cf1dd31e9eed89862a5d52aa",
+        "88cfd48dff1169879ba46840804b412fe02fefd6"
+    )
+
+    foreach ($name in @("Icon-192.png", "Icon-512.png")) {
+        $builtIcon = Join-Path $iconsPath $name
+        $builtBlob = (git hash-object -- $builtIcon).Trim()
+        if ($flutterTemplateBlobs -contains $builtBlob) {
+            throw "Flutter default icon detected in build\web\icons\$name. Publish stopped."
+        }
     }
 
     Write-Host "Generated branded Keepi PWA icons: standard + Android maskable (192x192 and 512x512)." -ForegroundColor Green
