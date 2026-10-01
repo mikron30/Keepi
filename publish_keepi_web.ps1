@@ -78,16 +78,16 @@ function Write-KeepiPwaIcons([string]$RepoPath) {
     }
 
     if (-not (Test-Path $generatorPath)) {
-        throw "Missing PWA icon generator: tool\generate_pwa_icons.dart"
+        throw "Missing Keepi icon generator: tool\generate_pwa_icons.dart"
     }
 
-    Write-Host "Generating PWA icons with Dart package:image (System.Drawing disabled)..." -ForegroundColor Cyan
+    Write-Host "Generating only the Keepi app icon..." -ForegroundColor Cyan
     dart.bat run "tool\generate_pwa_icons.dart" | Out-Host
     if ($LASTEXITCODE -ne 0) {
-        throw "Keepi PWA icon generation failed."
+        throw "Keepi icon generation failed."
     }
 
-    Write-Host "Generated clean Keepi PWA icons without Windows System.Drawing." -ForegroundColor Green
+    Write-Host "Keepi icon generated successfully." -ForegroundColor Green
 }
 
 function Deploy-FunctionsWithRetry([string]$ProjectId) {
@@ -248,10 +248,10 @@ Write-KeepiPwaIcons -RepoPath $ProjectPath
 
 $requiredWebFiles = @(
     "manifest.json",
-    "icons\keepi-v4-192.png",
-    "icons\keepi-v4-512.png",
-    "icons\keepi-v4-maskable-192.png",
-    "icons\keepi-v4-maskable-512.png",
+    "icons\Icon-192.png",
+    "icons\Icon-512.png",
+    "icons\Icon-maskable-192.png",
+    "icons\Icon-maskable-512.png",
     "sw.js",
     "index.html",
     "pwa-debug.html"
