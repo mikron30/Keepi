@@ -312,6 +312,8 @@ $requiredWebFiles = @(
     "manifest.json",
     "icons\Icon-192.png",
     "icons\Icon-512.png",
+    "icons\Icon-maskable-192.png",
+    "icons\Icon-maskable-512.png",
     "sw.js",
     "index.html",
     "pwa-debug.html"
