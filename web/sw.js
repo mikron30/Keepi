@@ -1,4 +1,4 @@
-const CACHE = 'keepi-app-runtime-v6';
+const CACHE = 'keepi-app-runtime-v7';
 
 self.addEventListener('install', () => {
   self.skipWaiting();
