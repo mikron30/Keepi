@@ -77,10 +77,10 @@ void main() {
   iconsDir.createSync(recursive: true);
 
   final outputs = <(int, bool, String)>[
-    (192, false, 'build/web/icons/keepi-v4-192.png'),
-    (512, false, 'build/web/icons/keepi-v4-512.png'),
-    (192, true, 'build/web/icons/keepi-v4-maskable-192.png'),
-    (512, true, 'build/web/icons/keepi-v4-maskable-512.png'),
+    (192, false, 'build/web/icons/Icon-192.png'),
+    (512, false, 'build/web/icons/Icon-512.png'),
+    (192, true, 'build/web/icons/Icon-maskable-192.png'),
+    (512, true, 'build/web/icons/Icon-maskable-512.png'),
   ];
 
   for (final (size, maskable, path) in outputs) {
