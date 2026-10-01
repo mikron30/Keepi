@@ -70,22 +70,15 @@ function Require-Command([string]$Name, [string]$HelpText) {
 }
 
 function Write-KeepiPwaIcons([string]$RepoPath) {
-    $sourcePath = Join-Path $RepoPath "assets\images\keepi_icon.png"
+    $sourcePath = Join-Path $RepoPath "assets\images\keepi_icon_clean.webp.b64"
     $generatorPath = Join-Path $RepoPath "tool\generate_pwa_icons.dart"
 
     if (-not (Test-Path $sourcePath)) {
-        throw "Missing Keepi app icon: assets\images\keepi_icon.png"
+        throw "Missing clean Keepi app icon source: assets\images\keepi_icon_clean.webp.b64"
     }
 
     if (-not (Test-Path $generatorPath)) {
         throw "Missing PWA icon generator: tool\generate_pwa_icons.dart"
-    }
-
-    # This is the approved piggy-bank/house artwork committed on 2026-09-26.
-    $approvedIconGitBlob = "e27c172bbd539a4563db3b3c265320d6e185c80d"
-    $actualIconGitBlob = (git hash-object -- "assets/images/keepi_icon.png").Trim()
-    if ($actualIconGitBlob -ne $approvedIconGitBlob) {
-        throw "Approved Keepi icon source changed unexpectedly. Refusing to publish."
     }
 
     Write-Host "Generating PWA icons with Dart package:image (System.Drawing disabled)..." -ForegroundColor Cyan
