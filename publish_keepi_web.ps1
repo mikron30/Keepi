@@ -71,108 +71,30 @@ function Require-Command([string]$Name, [string]$HelpText) {
 
 function Write-KeepiPwaIcons([string]$RepoPath) {
     $sourcePath = Join-Path $RepoPath "assets\images\keepi_icon.png"
-    $iconsPath = Join-Path $RepoPath "build\web\icons"
+    $generatorPath = Join-Path $RepoPath "tool\generate_pwa_icons.dart"
 
     if (-not (Test-Path $sourcePath)) {
         throw "Missing Keepi app icon: assets\images\keepi_icon.png"
     }
 
-    # Lock publishing to the approved piggy-bank/house Keepi artwork.
+    if (-not (Test-Path $generatorPath)) {
+        throw "Missing PWA icon generator: tool\generate_pwa_icons.dart"
+    }
+
+    # This is the approved piggy-bank/house artwork committed on 2026-09-26.
     $approvedIconGitBlob = "e27c172bbd539a4563db3b3c265320d6e185c80d"
     $actualIconGitBlob = (git hash-object -- "assets/images/keepi_icon.png").Trim()
     if ($actualIconGitBlob -ne $approvedIconGitBlob) {
-        throw "Approved Keepi icon source changed unexpectedly. Refusing to publish a fallback icon."
+        throw "Approved Keepi icon source changed unexpectedly. Refusing to publish."
     }
 
-    Add-Type -AssemblyName System.Drawing
-
-    New-Item -ItemType Directory -Force -Path $iconsPath | Out-Null
-
-    $source = [System.Drawing.Image]::FromFile($sourcePath)
-    $background = [System.Drawing.Color]::FromArgb(255, 7, 17, 29)
-
-    try {
-        $specs = @(
-            @{ Name = "Icon-192.png"; Size = 192; InsetRatio = 0.00 },
-            @{ Name = "Icon-512.png"; Size = 512; InsetRatio = 0.00 },
-            @{ Name = "Icon-maskable-192.png"; Size = 192; InsetRatio = 0.12 },
-            @{ Name = "Icon-maskable-512.png"; Size = 512; InsetRatio = 0.12 }
-        )
-
-        foreach ($spec in $specs) {
-            $size = [int]$spec.Size
-            $targetPath = Join-Path $iconsPath $spec.Name
-            $inset = [int][Math]::Round($size * [double]$spec.InsetRatio)
-            $available = $size - (2 * $inset)
-
-            $bitmap = [System.Drawing.Bitmap]::new(
-                $size,
-                $size,
-                [System.Drawing.Imaging.PixelFormat]::Format32bppArgb
-            )
-            $graphics = [System.Drawing.Graphics]::FromImage($bitmap)
-
-            try {
-                # Use an opaque Keepi navy canvas so Android launchers never
-                # substitute an odd background around transparent pixels.
-                $graphics.Clear($background)
-                $graphics.InterpolationMode = [System.Drawing.Drawing2D.InterpolationMode]::HighQualityBicubic
-                $graphics.PixelOffsetMode = [System.Drawing.Drawing2D.PixelOffsetMode]::HighQuality
-                $graphics.SmoothingMode = [System.Drawing.Drawing2D.SmoothingMode]::HighQuality
-                $graphics.CompositingQuality = [System.Drawing.Drawing2D.CompositingQuality]::HighQuality
-
-                $sourceRatio = [double]$source.Width / [double]$source.Height
-                if ($sourceRatio -ge 1.0) {
-                    $drawWidth = $available
-                    $drawHeight = [int][Math]::Round($available / $sourceRatio)
-                }
-                else {
-                    $drawHeight = $available
-                    $drawWidth = [int][Math]::Round($available * $sourceRatio)
-                }
-
-                $x = [int][Math]::Round(($size - $drawWidth) / 2.0)
-                $y = [int][Math]::Round(($size - $drawHeight) / 2.0)
-
-                $graphics.DrawImage($source, $x, $y, $drawWidth, $drawHeight)
-                $bitmap.Save($targetPath, [System.Drawing.Imaging.ImageFormat]::Png)
-            }
-            finally {
-                $graphics.Dispose()
-                $bitmap.Dispose()
-            }
-
-            $check = [System.Drawing.Image]::FromFile($targetPath)
-            try {
-                if ($check.Width -ne $size -or $check.Height -ne $size) {
-                    throw "Generated Keepi icon has wrong dimensions: $targetPath"
-                }
-            }
-            finally {
-                $check.Dispose()
-            }
-        }
-    }
-    finally {
-        $source.Dispose()
+    Write-Host "Generating PWA icons with Dart package:image (System.Drawing disabled)..." -ForegroundColor Cyan
+    dart.bat run "tool\generate_pwa_icons.dart" | Out-Host
+    if ($LASTEXITCODE -ne 0) {
+        throw "Keepi PWA icon generation failed."
     }
 
-    # These are the checked-in Flutter template icon blobs. They must never
-    # survive into a production Keepi build.
-    $flutterTemplateBlobs = @(
-        "b749bfef07473333cf1dd31e9eed89862a5d52aa",
-        "88cfd48dff1169879ba46840804b412fe02fefd6"
-    )
-
-    foreach ($name in @("Icon-192.png", "Icon-512.png")) {
-        $builtIcon = Join-Path $iconsPath $name
-        $builtBlob = (git hash-object -- $builtIcon).Trim()
-        if ($flutterTemplateBlobs -contains $builtBlob) {
-            throw "Flutter default icon detected in build\web\icons\$name. Publish stopped."
-        }
-    }
-
-    Write-Host "Generated branded Keepi PWA icons: standard + Android maskable (192x192 and 512x512)." -ForegroundColor Green
+    Write-Host "Generated clean Keepi PWA icons without Windows System.Drawing." -ForegroundColor Green
 }
 
 function Deploy-FunctionsWithRetry([string]$ProjectId) {
@@ -270,6 +192,7 @@ Write-Host "Keepi - Publish production installable app" -ForegroundColor Green
 
 Require-Command "git.exe" "Install Git for Windows."
 Require-Command "flutter.bat" "Install Flutter and make sure it is in PATH."
+Require-Command "dart.bat" "Dart is included with Flutter; run flutter doctor if it is missing."
 Require-Command "firebase.cmd" "Install Firebase CLI with: npm.cmd install -g firebase-tools"
 Require-Command "npm.cmd" "Install Node.js/npm before deploying Keepi Cloud Functions."
 
@@ -332,10 +255,10 @@ Write-KeepiPwaIcons -RepoPath $ProjectPath
 
 $requiredWebFiles = @(
     "manifest.json",
-    "icons\Icon-192.png",
-    "icons\Icon-512.png",
-    "icons\Icon-maskable-192.png",
-    "icons\Icon-maskable-512.png",
+    "icons\keepi-v4-192.png",
+    "icons\keepi-v4-512.png",
+    "icons\keepi-v4-maskable-192.png",
+    "icons\keepi-v4-maskable-512.png",
     "sw.js",
     "index.html",
     "pwa-debug.html"
