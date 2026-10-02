@@ -30,6 +30,9 @@ jobs:
       - name: Test
         run: flutter test
 
+      - name: Build Web
+        run: flutter build web --release
+
       - name: Install Node for Cloud Functions
         uses: actions/setup-node@v4
         with:
