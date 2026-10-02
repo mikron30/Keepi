@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../core/ads/keepi_admob_banner.dart';
+
 class MainShell extends StatelessWidget {
   const MainShell({
     required this.navigationShell,
@@ -22,40 +24,46 @@ class MainShell extends StatelessWidget {
 
     return Scaffold(
       body: navigationShell,
-      bottomNavigationBar: NavigationBar(
-        selectedIndex: navigationShell.currentIndex,
-        onDestinationSelected: _goBranch,
-        destinations: [
-          const NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home_rounded),
-            label: 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.inventory_2_outlined),
-            selectedIcon: Icon(Icons.inventory_2_rounded),
-            label: 'My Things',
-          ),
-          NavigationDestination(
-            icon: _AddNavIcon(
-              background: scheme.primary.withValues(alpha: 0.16),
-              foreground: scheme.primary,
-            ),
-            selectedIcon: _AddNavIcon(
-              background: scheme.primary,
-              foreground: scheme.onPrimary,
-            ),
-            label: 'Add',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.travel_explore_outlined),
-            selectedIcon: Icon(Icons.travel_explore),
-            label: 'Explore',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
+      bottomNavigationBar: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const KeepiAdMobBanner(),
+          NavigationBar(
+            selectedIndex: navigationShell.currentIndex,
+            onDestinationSelected: _goBranch,
+            destinations: [
+              const NavigationDestination(
+                icon: Icon(Icons.home_outlined),
+                selectedIcon: Icon(Icons.home_rounded),
+                label: 'Home',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.inventory_2_outlined),
+                selectedIcon: Icon(Icons.inventory_2_rounded),
+                label: 'My Things',
+              ),
+              NavigationDestination(
+                icon: _AddNavIcon(
+                  background: scheme.primary.withValues(alpha: 0.16),
+                  foreground: scheme.primary,
+                ),
+                selectedIcon: _AddNavIcon(
+                  background: scheme.primary,
+                  foreground: scheme.onPrimary,
+                ),
+                label: 'Add',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.travel_explore_outlined),
+                selectedIcon: Icon(Icons.travel_explore),
+                label: 'Explore',
+              ),
+              const NavigationDestination(
+                icon: Icon(Icons.person_outline),
+                selectedIcon: Icon(Icons.person),
+                label: 'Profile',
+              ),
+            ],
           ),
         ],
       ),
