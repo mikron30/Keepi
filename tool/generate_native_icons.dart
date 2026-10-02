@@ -52,6 +52,9 @@ void _writePng(img.Image source, int size, String path, {double inset = 0.06}) {
 void main() {
   final source = _loadSource();
 
+  // Replace the old/corrupt Flutter runtime asset only in the native build workspace.
+  _writePng(source, 512, 'assets/images/keepi_icon.png', inset: 0.06);
+
   const android = <String, int>{
     'android/app/src/main/res/mipmap-mdpi/ic_launcher.png': 48,
     'android/app/src/main/res/mipmap-hdpi/ic_launcher.png': 72,
