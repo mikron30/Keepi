@@ -1,6 +1,58 @@
 workflows:
-  keepi-mobile:
-    name: Keepi Android + iPhone
+  keepi-android:
+    name: Keepi Android
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      flutter: stable
+
+    scripts:
+      - name: Get Flutter packages
+        script: flutter pub get
+
+      - name: Generate Keepi native icons
+        script: dart run tool/generate_native_icons.dart
+
+      - name: Analyze
+        script: flutter analyze
+
+      - name: Test
+        script: flutter test
+
+      - name: Prepare Android Firebase defines
+        script: |
+          DEFINES=""
+          add_define () {
+            NAME="$1"
+            VALUE="$2"
+            if [ -n "$VALUE" ]; then
+              DEFINES="$DEFINES --dart-define=$NAME=$VALUE"
+            fi
+          }
+          add_define FIREBASE_API_KEY "$FIREBASE_ANDROID_API_KEY"
+          add_define FIREBASE_APP_ID "$FIREBASE_ANDROID_APP_ID"
+          add_define FIREBASE_MESSAGING_SENDER_ID "$FIREBASE_ANDROID_MESSAGING_SENDER_ID"
+          add_define FIREBASE_PROJECT_ID "$FIREBASE_ANDROID_PROJECT_ID"
+          add_define FIREBASE_AUTH_DOMAIN "$FIREBASE_ANDROID_AUTH_DOMAIN"
+          add_define FIREBASE_STORAGE_BUCKET "$FIREBASE_ANDROID_STORAGE_BUCKET"
+          add_define FIREBASE_MEASUREMENT_ID "$FIREBASE_ANDROID_MEASUREMENT_ID"
+          echo "CM_KEEPI_FIREBASE_DEFINES=$DEFINES" >> "$CM_ENV"
+
+      - name: Build Android APK
+        script: |
+          eval flutter build apk --release $CM_KEEPI_FIREBASE_DEFINES
+
+      - name: Build Android AAB
+        script: |
+          eval flutter build appbundle --release $CM_KEEPI_FIREBASE_DEFINES
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/bundle/release/app-release.aab
+
+  keepi-ios:
+    name: Keepi iPhone
     instance_type: mac_mini_m2
     max_build_duration: 120
 
@@ -11,43 +63,33 @@ workflows:
 
     scripts:
       - name: Get Flutter packages
-        script: |
-          flutter pub get
+        script: flutter pub get
 
       - name: Generate Keepi native icons
-        script: |
-          dart run tool/generate_native_icons.dart
+        script: dart run tool/generate_native_icons.dart
 
-      - name: Analyze
-        script: |
-          flutter analyze
-
-      - name: Test
-        script: |
-          flutter test
-
-      - name: Prepare optional Firebase defines
+      - name: Prepare iOS Firebase defines
         script: |
           DEFINES=""
-          for NAME in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_MESSAGING_SENDER_ID FIREBASE_PROJECT_ID FIREBASE_AUTH_DOMAIN FIREBASE_STORAGE_BUCKET FIREBASE_MEASUREMENT_ID; do
-            VALUE=$(printenv "$NAME" || true)
+          add_define () {
+            NAME="$1"
+            VALUE="$2"
             if [ -n "$VALUE" ]; then
               DEFINES="$DEFINES --dart-define=$NAME=$VALUE"
             fi
-          done
-          echo "CM_KEEPi_FIREBASE_DEFINES=$DEFINES" >> "$CM_ENV"
-
-      - name: Build Android APK
-        script: |
-          eval flutter build apk --release $CM_KEEPi_FIREBASE_DEFINES
-
-      - name: Build Android AAB
-        script: |
-          eval flutter build appbundle --release $CM_KEEPi_FIREBASE_DEFINES
+          }
+          add_define FIREBASE_API_KEY "$FIREBASE_IOS_API_KEY"
+          add_define FIREBASE_APP_ID "$FIREBASE_IOS_APP_ID"
+          add_define FIREBASE_MESSAGING_SENDER_ID "$FIREBASE_IOS_MESSAGING_SENDER_ID"
+          add_define FIREBASE_PROJECT_ID "$FIREBASE_IOS_PROJECT_ID"
+          add_define FIREBASE_AUTH_DOMAIN "$FIREBASE_IOS_AUTH_DOMAIN"
+          add_define FIREBASE_STORAGE_BUCKET "$FIREBASE_IOS_STORAGE_BUCKET"
+          add_define FIREBASE_MEASUREMENT_ID "$FIREBASE_IOS_MEASUREMENT_ID"
+          echo "CM_KEEPI_FIREBASE_DEFINES=$DEFINES" >> "$CM_ENV"
 
       - name: Build iPhone unsigned
         script: |
-          eval flutter build ios --release --no-codesign $CM_KEEPi_FIREBASE_DEFINES
+          eval flutter build ios --release --no-codesign $CM_KEEPI_FIREBASE_DEFINES
 
       - name: Package iPhone build
         script: |
@@ -55,6 +97,4 @@ workflows:
           ditto -c -k --sequesterRsrc --keepParent Runner.app ../../../keepi-ios-unsigned.zip
 
     artifacts:
-      - build/app/outputs/flutter-apk/app-release.apk
-      - build/app/outputs/bundle/release/app-release.aab
       - keepi-ios-unsigned.zip
