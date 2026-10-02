@@ -1,0 +1,60 @@
+workflows:
+  keepi-mobile:
+    name: Keepi Android + iPhone
+    instance_type: mac_mini_m2
+    max_build_duration: 120
+
+    environment:
+      flutter: stable
+      xcode: latest
+      cocoapods: default
+
+    scripts:
+      - name: Get Flutter packages
+        script: |
+          flutter pub get
+
+      - name: Generate Keepi native icons
+        script: |
+          dart run tool/generate_native_icons.dart
+
+      - name: Analyze
+        script: |
+          flutter analyze
+
+      - name: Test
+        script: |
+          flutter test
+
+      - name: Prepare optional Firebase defines
+        script: |
+          DEFINES=""
+          for NAME in FIREBASE_API_KEY FIREBASE_APP_ID FIREBASE_MESSAGING_SENDER_ID FIREBASE_PROJECT_ID FIREBASE_AUTH_DOMAIN FIREBASE_STORAGE_BUCKET FIREBASE_MEASUREMENT_ID; do
+            VALUE=$(printenv "$NAME" || true)
+            if [ -n "$VALUE" ]; then
+              DEFINES="$DEFINES --dart-define=$NAME=$VALUE"
+            fi
+          done
+          echo "CM_KEEPi_FIREBASE_DEFINES=$DEFINES" >> "$CM_ENV"
+
+      - name: Build Android APK
+        script: |
+          eval flutter build apk --release $CM_KEEPi_FIREBASE_DEFINES
+
+      - name: Build Android AAB
+        script: |
+          eval flutter build appbundle --release $CM_KEEPi_FIREBASE_DEFINES
+
+      - name: Build iPhone unsigned
+        script: |
+          eval flutter build ios --release --no-codesign $CM_KEEPi_FIREBASE_DEFINES
+
+      - name: Package iPhone build
+        script: |
+          cd build/ios/iphoneos
+          ditto -c -k --sequesterRsrc --keepParent Runner.app ../../../keepi-ios-unsigned.zip
+
+    artifacts:
+      - build/app/outputs/flutter-apk/app-release.apk
+      - build/app/outputs/bundle/release/app-release.aab
+      - keepi-ios-unsigned.zip
