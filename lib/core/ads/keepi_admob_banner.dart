@@ -21,7 +21,10 @@ class _KeepiAdMobBannerState extends State<KeepiAdMobBanner> {
         defaultValue: 'ca-app-pub-6120568543364688/1935114293',
       );
   static const _iosProductionBannerId =
-      String.fromEnvironment('ADMOB_IOS_BANNER_ID');
+      String.fromEnvironment(
+        'ADMOB_IOS_BANNER_ID',
+        defaultValue: 'ca-app-pub-6120568543364688/5595157700',
+      );
 
   BannerAd? _bannerAd;
   bool _loaded = false;
