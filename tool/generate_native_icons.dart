@@ -53,7 +53,7 @@ void main() {
   final source = _loadSource();
 
   // Replace the old/corrupt Flutter runtime asset only in the native build workspace.
-  _writePng(source, 512, 'assets/images/keepi_icon.png', inset: 0.06);
+  _writePng(source, 512, 'assets/images/keepi_icon.png', inset: 0.0);
 
   const android = <String, int>{
     'android/app/src/main/res/mipmap-mdpi/ic_launcher.png': 48,
@@ -64,7 +64,22 @@ void main() {
   };
 
   for (final entry in android.entries) {
-    _writePng(source, entry.value, entry.key, inset: 0.08);
+    _writePng(source, entry.value, entry.key, inset: 0.0);
+  }
+
+  // Android 8+ adaptive launcher layer sizes. Use the approved Keepi artwork
+  // as the full background layer so Android does not place the legacy icon
+  // inside an extra white/gray plate.
+  const androidAdaptive = <String, int>{
+    'android/app/src/main/res/mipmap-mdpi/ic_launcher_full.png': 108,
+    'android/app/src/main/res/mipmap-hdpi/ic_launcher_full.png': 162,
+    'android/app/src/main/res/mipmap-xhdpi/ic_launcher_full.png': 216,
+    'android/app/src/main/res/mipmap-xxhdpi/ic_launcher_full.png': 324,
+    'android/app/src/main/res/mipmap-xxxhdpi/ic_launcher_full.png': 432,
+  };
+
+  for (final entry in androidAdaptive.entries) {
+    _writePng(source, entry.value, entry.key, inset: 0.0);
   }
 
   const ios = <String, int>{
@@ -87,7 +102,7 @@ void main() {
 
   const iosDir = 'ios/Runner/Assets.xcassets/AppIcon.appiconset';
   for (final entry in ios.entries) {
-    _writePng(source, entry.value, iosDir + '/' + entry.key, inset: 0.06);
+    _writePng(source, entry.value, iosDir + '/' + entry.key, inset: 0.0);
   }
 
   stdout.writeln('Generated Keepi Android and iOS launcher icons.');
