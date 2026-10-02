@@ -13,6 +13,9 @@ if (-not (Test-Path "lib\firebase_options.dart")) {
     throw "Missing lib\firebase_options.dart. Run setup_keepi.ps1 / flutterfire configure first."
 }
 
+flutter clean
+if ($LASTEXITCODE -ne 0) { throw "flutter clean failed." }
+
 flutter pub get
 if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 
