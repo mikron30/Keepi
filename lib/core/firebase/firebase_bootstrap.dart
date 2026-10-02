@@ -23,14 +23,12 @@ class FirebaseBootstrap {
   static Future<bool> tryInitialize() async {
     try {
       if (Firebase.apps.isEmpty) {
-        if (kIsWeb) {
-          if (_apiKey.isEmpty ||
-              _appId.isEmpty ||
-              _messagingSenderId.isEmpty ||
-              _projectId.isEmpty) {
-            return false;
-          }
+        final hasExplicitOptions = _apiKey.isNotEmpty &&
+            _appId.isNotEmpty &&
+            _messagingSenderId.isNotEmpty &&
+            _projectId.isNotEmpty;
 
+        if (hasExplicitOptions) {
           await Firebase.initializeApp(
             options: FirebaseOptions(
               apiKey: _apiKey,
@@ -42,7 +40,11 @@ class FirebaseBootstrap {
               measurementId: _measurementId.isEmpty ? null : _measurementId,
             ),
           );
+        } else if (kIsWeb) {
+          return false;
         } else {
+          // Supports a locally generated google-services.json /
+          // GoogleService-Info.plist when present.
           await Firebase.initializeApp();
         }
       }
