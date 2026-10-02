@@ -1,0 +1,98 @@
+name: Mobile Builds
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    paths:
+      - 'lib/**'
+      - 'android/**'
+      - 'ios/**'
+      - 'pubspec.yaml'
+      - 'pubspec.lock'
+      - 'assets/images/keepi_icon_clean.webp.b64'
+      - 'tool/generate_native_icons.dart'
+      - '.github/workflows/mobile-builds.yml'
+
+jobs:
+  android:
+    name: Android APK + AAB
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Generate Keepi native icons
+        run: dart run tool/generate_native_icons.dart
+
+      - name: Analyze
+        run: flutter analyze
+
+      - name: Test
+        run: flutter test
+
+      - name: Build APK
+        run: flutter build apk --release
+
+      - name: Build AAB
+        run: flutter build appbundle --release
+
+      - name: Upload Android APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: keepi-android-apk
+          path: build/app/outputs/flutter-apk/app-release.apk
+          if-no-files-found: error
+
+      - name: Upload Android AAB
+        uses: actions/upload-artifact@v4
+        with:
+          name: keepi-android-aab
+          path: build/app/outputs/bundle/release/app-release.aab
+          if-no-files-found: error
+
+  ios:
+    name: iPhone unsigned build
+    runs-on: macos-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          channel: stable
+          cache: true
+
+      - name: Dependencies
+        run: flutter pub get
+
+      - name: Generate Keepi native icons
+        run: dart run tool/generate_native_icons.dart
+
+      - name: Build iOS without signing
+        run: flutter build ios --release --no-codesign
+
+      - name: Package iPhone app
+        run: |
+          cd build/ios/iphoneos
+          ditto -c -k --sequesterRsrc --keepParent Runner.app ../../../keepi-ios-unsigned.zip
+
+      - name: Upload iPhone build
+        uses: actions/upload-artifact@v4
+        with:
+          name: keepi-ios-unsigned
+          path: keepi-ios-unsigned.zip
+          if-no-files-found: error
