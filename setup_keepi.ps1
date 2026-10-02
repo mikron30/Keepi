@@ -261,7 +261,7 @@ Write-Host "Matzav Firebase project will not be used." -ForegroundColor Green
 
 Write-Step "8/10 - Configuring Firebase for Keepi only"
 Write-Host "Registering Android, iOS and Web apps inside: $projectId" -ForegroundColor Cyan
-& $flutterfireCommand configure --project "$projectId" --platforms "android,ios,web" --yes
+& $flutterfireCommand configure --project "$projectId" --platforms "android,ios,web" --android-package-name "com.mikron30.keepi" --ios-bundle-id "com.mikron30.keepi" --yes
 if ($LASTEXITCODE -ne 0) {
     throw "FlutterFire configuration failed."
 }
