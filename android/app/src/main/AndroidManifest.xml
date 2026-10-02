@@ -5,7 +5,8 @@
     <application
         android:label="Keepi"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:roundIcon="@mipmap/ic_launcher_round">
         <!-- Google sample AdMob app ID for safe development/testing. -->
         <meta-data
             android:name="com.google.android.gms.ads.APPLICATION_ID"
