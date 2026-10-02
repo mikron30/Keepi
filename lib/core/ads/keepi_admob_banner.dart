@@ -51,7 +51,20 @@ class _KeepiAdMobBannerState extends State<KeepiAdMobBanner> {
     super.initState();
 
     if (_supported) {
+      _initializeAndLoadBanner();
+    }
+  }
+
+  Future<void> _initializeAndLoadBanner() async {
+    try {
+      await MobileAds.instance.initialize();
+      if (!mounted) {
+        return;
+      }
       _loadBanner();
+    } catch (error) {
+      debugPrint('Keepi AdMob initialization failed: $error');
+      // Advertising must never prevent Keepi itself from starting.
     }
   }
 
