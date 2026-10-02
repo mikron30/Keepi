@@ -13,6 +13,10 @@ if (-not (Test-Path "lib\firebase_options.dart")) {
     throw "Missing lib\firebase_options.dart. Run setup_keepi.ps1 / flutterfire configure first."
 }
 
+if (-not (Test-Path "android\key.properties") -or -not (Test-Path "android\app\upload-keystore.jks")) {
+    throw "Android release signing is not configured. Run .\setup_android_signing.cmd once, then run this build again."
+}
+
 flutter clean
 if ($LASTEXITCODE -ne 0) { throw "flutter clean failed." }
 
