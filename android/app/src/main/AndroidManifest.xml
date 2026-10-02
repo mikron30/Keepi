@@ -11,7 +11,7 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-6120568543364688~6863921626" />
         <activity
-            android:name=".MainActivity"
+            android:name="com.mikron30.keepi.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
