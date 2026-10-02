@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/location/location_service.dart';
 import '../../../core/theme/theme_preference.dart';
@@ -16,6 +17,10 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
+  static final _privacyUri =
+      Uri.parse('https://keepi.web.app/app/privacy.html');
+  static final _deleteAccountUri =
+      Uri.parse('https://keepi.web.app/app/delete-account.html');
   late final UserProfileRepository _profileRepository;
   bool _savingLocation = false;
 
@@ -93,6 +98,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
       if (mounted) {
         setState(() => _savingLocation = false);
       }
+    }
+  }
+
+  Future<void> _openExternal(Uri uri) async {
+    final opened = await launchUrl(
+      uri,
+      mode: LaunchMode.externalApplication,
+    );
+
+    if (!opened) {
+      _showMessage('Could not open the web page.');
     }
   }
 
@@ -266,6 +282,28 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       leading: Icon(Icons.settings_outlined),
                       title: Text('Settings'),
                       trailing: Icon(Icons.chevron_right),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 12),
+              Card(
+                child: Column(
+                  children: [
+                    ListTile(
+                      leading: const Icon(Icons.privacy_tip_outlined),
+                      title: const Text('Privacy policy'),
+                      subtitle: const Text('How Keepi collects and uses data'),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: () => _openExternal(_privacyUri),
+                    ),
+                    const Divider(height: 1),
+                    ListTile(
+                      leading: const Icon(Icons.delete_forever_outlined),
+                      title: const Text('Delete account & data'),
+                      subtitle: const Text('Request deletion of your Keepi account'),
+                      trailing: const Icon(Icons.open_in_new),
+                      onTap: () => _openExternal(_deleteAccountUri),
                     ),
                   ],
                 ),
