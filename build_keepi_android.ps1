@@ -26,6 +26,9 @@ if ($LASTEXITCODE -ne 0) { throw "flutter pub get failed." }
 dart.bat run "tool\generate_native_icons.dart" | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "Keepi icon generation failed." }
 
+dart.bat run "tool\export_play_store_assets.dart" | Out-Host
+if ($LASTEXITCODE -ne 0) { throw "Google Play asset generation failed." }
+
 $firebaseDefines = @(dart.bat run "tool\print_firebase_defines.dart" android)
 if ($LASTEXITCODE -ne 0 -or $firebaseDefines.Count -lt 4) {
     throw "Could not read Android Firebase configuration."
@@ -41,3 +44,7 @@ Write-Host ""
 Write-Host "Android build complete:" -ForegroundColor Green
 Write-Host (Join-Path $ProjectPath "build\app\outputs\flutter-apk\app-release.apk") -ForegroundColor Yellow
 Write-Host (Join-Path $ProjectPath "build\app\outputs\bundle\release\app-release.aab") -ForegroundColor Yellow
+Write-Host ""
+Write-Host "Google Play assets:" -ForegroundColor Green
+Write-Host (Join-Path $ProjectPath "release\google_play\assets\app_icon_512.png") -ForegroundColor Yellow
+Write-Host (Join-Path $ProjectPath "release\google_play\assets\feature_graphic_1024x500.png") -ForegroundColor Yellow
