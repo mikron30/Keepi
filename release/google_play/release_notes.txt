@@ -1,0 +1,21 @@
+<iw-IL>
+גרסת השקה ראשונה של Keepi:
+• ניהול מלאי אישי
+• זיהוי פריטים באמצעות AI
+• סריקת פריט בודד או מספר פריטים
+• חיפוש פריטים בסביבה
+• צ'אט בין משתמשים
+• דיווח וחסימת משתמשים
+• הגדרות פרטיות ומחיקת חשבון
+</iw-IL>
+
+<en-US>
+First Keepi release:
+• Personal inventory management
+• AI-assisted item recognition
+• Single and multi-item scanning
+• Nearby discovery
+• User messaging
+• Reporting and blocking tools
+• Privacy and account-deletion controls
+</en-US>
