@@ -57,11 +57,53 @@ class _KeepiAdMobBannerState extends State<KeepiAdMobBanner> {
 
   Future<void> _initializeAndLoadBanner() async {
     try {
-      await MobileAds.instance.initialize();
-      if (!mounted) {
-        return;
-      }
-      _loadBanner();
+      final params = ConsentRequestParameters();
+
+      ConsentInformation.instance.requestConsentInfoUpdate(
+        params,
+        () {
+          ConsentForm.loadAndShowConsentFormIfRequired(
+            (formError) async {
+              if (formError != null) {
+                debugPrint(
+                  'Keepi consent form failed: '
+                  '${formError.errorCode}: ${formError.message}',
+                );
+              }
+
+              final canRequestAds =
+                  await ConsentInformation.instance.canRequestAds();
+
+              if (!mounted || !canRequestAds) {
+                return;
+              }
+
+              await MobileAds.instance.initialize();
+              if (mounted) {
+                _loadBanner();
+              }
+            },
+          );
+        },
+        (formError) async {
+          debugPrint(
+            'Keepi consent update failed: '
+            '${formError.errorCode}: ${formError.message}',
+          );
+
+          // A previous valid consent state may still permit ads.
+          final canRequestAds =
+              await ConsentInformation.instance.canRequestAds();
+          if (!mounted || !canRequestAds) {
+            return;
+          }
+
+          await MobileAds.instance.initialize();
+          if (mounted) {
+            _loadBanner();
+          }
+        },
+      );
     } catch (error) {
       debugPrint('Keepi AdMob initialization failed: $error');
       // Advertising must never prevent Keepi itself from starting.
