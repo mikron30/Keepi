@@ -1,5 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/firebase/firebase_bootstrap.dart';
 import '../data/auth_service.dart';
@@ -92,7 +94,10 @@ class _AuthGateState extends State<AuthGate> {
           return const AuthScreen();
         }
 
-        return widget.child;
+        return _TermsGate(
+          user: snapshot.data!,
+          child: widget.child,
+        );
       },
     );
   }
@@ -194,6 +199,131 @@ class _FirebaseNotReadyScreen extends StatelessWidget {
           ),
         ),
       ),
+    );
+  }
+}
+
+
+class _TermsGate extends StatefulWidget {
+  const _TermsGate({
+    required this.user,
+    required this.child,
+  });
+
+  final User user;
+  final Widget child;
+
+  @override
+  State<_TermsGate> createState() => _TermsGateState();
+}
+
+class _TermsGateState extends State<_TermsGate> {
+  static final _termsUri = Uri.parse(
+    'https://keepi.web.app/app/terms.html',
+  );
+
+  bool _agreed = false;
+  bool _saving = false;
+
+  DocumentReference<Map<String, dynamic>> get _profileRef =>
+      FirebaseFirestore.instance.collection('users').doc(widget.user.uid);
+
+  Future<void> _openTerms() async {
+    await launchUrl(_termsUri, mode: LaunchMode.externalApplication);
+  }
+
+  Future<void> _accept() async {
+    if (!_agreed || _saving) return;
+
+    setState(() => _saving = true);
+    try {
+      await _profileRef.set({
+        'termsAcceptedAt': FieldValue.serverTimestamp(),
+        'termsVersion': '2026-10-03',
+      }, SetOptions(merge: true));
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+      stream: _profileRef.snapshots(),
+      builder: (context, snapshot) {
+        final data = snapshot.data?.data();
+        if (data != null && data['termsAcceptedAt'] != null) {
+          return widget.child;
+        }
+
+        return Scaffold(
+          body: SafeArea(
+            child: Center(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(24),
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 520),
+                  child: Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: [
+                          Text(
+                            'Keepi community rules',
+                            style: Theme.of(context)
+                                .textTheme
+                                .headlineSmall
+                                ?.copyWith(fontWeight: FontWeight.w800),
+                          ),
+                          const SizedBox(height: 12),
+                          const Text(
+                            'Before using Keepi, please accept the Terms of Use. '
+                            'Keepi does not allow illegal, abusive, deceptive, '
+                            'harassing or otherwise objectionable content or behavior.',
+                          ),
+                          const SizedBox(height: 12),
+                          TextButton.icon(
+                            onPressed: _openTerms,
+                            icon: const Icon(Icons.open_in_new),
+                            label: const Text('Read Terms of Use'),
+                          ),
+                          CheckboxListTile(
+                            contentPadding: EdgeInsets.zero,
+                            value: _agreed,
+                            onChanged: _saving
+                                ? null
+                                : (value) =>
+                                    setState(() => _agreed = value ?? false),
+                            title: const Text(
+                              'I agree to the Keepi Terms of Use',
+                            ),
+                            controlAffinity: ListTileControlAffinity.leading,
+                          ),
+                          const SizedBox(height: 8),
+                          FilledButton(
+                            onPressed: _agreed && !_saving ? _accept : null,
+                            child: _saving
+                                ? const SizedBox(
+                                    width: 20,
+                                    height: 20,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                    ),
+                                  )
+                                : const Text('Continue to Keepi'),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
