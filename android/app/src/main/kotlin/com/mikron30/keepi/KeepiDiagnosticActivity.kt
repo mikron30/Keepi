@@ -20,9 +20,10 @@ class KeepiDiagnosticActivity : Activity() {
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        super.onCreate(savedInstanceState)
         installCrashRecorder()
-        recordStage("native_diagnostic_activity_onCreate")
+        recordStage("native_diagnostic_before_super")
+        super.onCreate(savedInstanceState)
+        recordStage("native_diagnostic_after_super")
 
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
