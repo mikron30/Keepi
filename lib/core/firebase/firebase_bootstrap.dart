@@ -5,6 +5,9 @@ import 'package:flutter/foundation.dart';
 class FirebaseBootstrap {
   FirebaseBootstrap._();
 
+  static String? lastError;
+  static bool isReady = false;
+
   static const _apiKey = String.fromEnvironment('FIREBASE_API_KEY');
   static const _appId = String.fromEnvironment('FIREBASE_APP_ID');
   static const _messagingSenderId =
@@ -21,6 +24,7 @@ class FirebaseBootstrap {
       '6LfKk8stAAAAAKqQJ8qXzXGHrDS_axX_VJa8_vBR';
 
   static Future<bool> tryInitialize() async {
+    lastError = null;
     try {
       if (Firebase.apps.isEmpty) {
         final hasExplicitOptions = _apiKey.isNotEmpty &&
@@ -57,8 +61,11 @@ class FirebaseBootstrap {
         );
       }
 
+      isReady = true;
       return true;
-    } catch (error) {
+    } catch (error, stack) {
+      isReady = false;
+      lastError = '$error\n$stack';
       debugPrint('Firebase bootstrap failed: $error');
       return false;
     }
