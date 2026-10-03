@@ -330,17 +330,15 @@ class _KeepiDiagnosticRootState extends State<KeepiDiagnosticRoot> {
                 ),
                 const SizedBox(height: 10),
                 TextButton.icon(
-                  onPressed: () async {
-                    await Clipboard.setData(
+                  onPressed: () {
+                    Clipboard.setData(
                       ClipboardData(text: diagnostics.buildReport()),
                     );
-                    if (mounted) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text('Diagnostic report copied.'),
-                        ),
-                      );
-                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Diagnostic report copied.'),
+                      ),
+                    );
                   },
                   icon: const Icon(Icons.copy),
                   label: const Text('Copy full report'),
