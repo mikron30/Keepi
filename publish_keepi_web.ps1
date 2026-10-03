@@ -276,6 +276,12 @@ if (Test-Path $hostingRoot) {
 New-Item -ItemType Directory -Force -Path $appHostingPath | Out-Null
 Copy-Item -Path (Join-Path $ProjectPath "build\web\*") -Destination $appHostingPath -Recurse -Force
 
+Write-Host "Publishing app-ads.txt at hosting root..." -ForegroundColor Cyan
+$appAdsSource = Join-Path $ProjectPath "web\app-ads.txt"
+if (Test-Path $appAdsSource) {
+    Copy-Item -Path $appAdsSource -Destination (Join-Path $hostingRoot "app-ads.txt") -Force
+}
+
 $versionText = "Keepi commit: $commitId`nPublished: $(Get-Date -Format o)"
 Set-Content -Path (Join-Path $appHostingPath "keepi-version.txt") -Value $versionText -Encoding ascii
 
