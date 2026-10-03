@@ -1,7 +1,9 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../core/location/location_service.dart';
@@ -99,6 +101,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
         setState(() => _savingLocation = false);
       }
     }
+  }
+
+  Future<bool> _adPrivacyOptionsRequired() async {
+    if (kIsWeb ||
+        (defaultTargetPlatform != TargetPlatform.android &&
+            defaultTargetPlatform != TargetPlatform.iOS)) {
+      return false;
+    }
+
+    try {
+      return await ConsentInformation.instance
+              .getPrivacyOptionsRequirementStatus() ==
+          PrivacyOptionsRequirementStatus.required;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  void _showAdPrivacyOptions() {
+    ConsentForm.showPrivacyOptionsForm((formError) {
+      if (formError != null) {
+        _showMessage(
+          'Could not open ad privacy choices: ${formError.message}',
+        );
+      }
+    });
   }
 
   Future<void> _openExternal(Uri uri) async {
@@ -304,6 +332,29 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       subtitle: const Text('Request deletion of your Keepi account'),
                       trailing: const Icon(Icons.open_in_new),
                       onTap: () => _openExternal(_deleteAccountUri),
+                    ),
+                    FutureBuilder<bool>(
+                      future: _adPrivacyOptionsRequired(),
+                      builder: (context, snapshot) {
+                        if (snapshot.data != true) {
+                          return const SizedBox.shrink();
+                        }
+
+                        return Column(
+                          children: [
+                            const Divider(height: 1),
+                            ListTile(
+                              leading: const Icon(Icons.ads_click_outlined),
+                              title: const Text('Ad privacy choices'),
+                              subtitle: const Text(
+                                'Manage consent choices for advertising',
+                              ),
+                              trailing: const Icon(Icons.chevron_right),
+                              onTap: _showAdPrivacyOptions,
+                            ),
+                          ],
+                        );
+                      },
                     ),
                   ],
                 ),
