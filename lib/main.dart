@@ -33,9 +33,9 @@ void main() {
   runZonedGuarded(
     () {
       runApp(
-        ProviderScope(
+        const ProviderScope(
           child: KeepiDiagnosticRoot(
-            app: const KeepiApp(),
+            app: KeepiApp(),
           ),
         ),
       );
