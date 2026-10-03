@@ -10,16 +10,21 @@ class ThemePreference {
       ValueNotifier<ThemeMode>(ThemeMode.system);
 
   static Future<void> load() async {
-    final preferences = await SharedPreferences.getInstance();
+    try {
+      final preferences = await SharedPreferences.getInstance();
 
-    if (!preferences.containsKey(_darkModeKey)) {
+      if (!preferences.containsKey(_darkModeKey)) {
+        notifier.value = ThemeMode.system;
+        return;
+      }
+
+      notifier.value = preferences.getBool(_darkModeKey) == true
+          ? ThemeMode.dark
+          : ThemeMode.light;
+    } catch (error) {
+      debugPrint('Keepi theme preference load failed: $error');
       notifier.value = ThemeMode.system;
-      return;
     }
-
-    notifier.value = preferences.getBool(_darkModeKey) == true
-        ? ThemeMode.dark
-        : ThemeMode.light;
   }
 
   static Future<void> setDarkMode(bool enabled) async {
