@@ -5,7 +5,7 @@
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
     <application
         android:label="Keepi"
-        android:name="${applicationName}"
+        android:name="com.mikron30.keepi.KeepiApplication"
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round">
         <!-- Google sample AdMob app ID for safe development/testing. -->
@@ -15,7 +15,7 @@
         <activity
             android:name="com.mikron30.keepi.KeepiDiagnosticActivity"
             android:exported="true"
-            android:theme="@style/NormalTheme">
+            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN"/>
                 <category android:name="android.intent.category.LAUNCHER"/>
