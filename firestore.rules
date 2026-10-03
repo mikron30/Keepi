@@ -36,6 +36,10 @@ service cloud.firestore {
       match /thingLocations/{thingId} {
         allow read, create, update, delete: if isUser(userId);
       }
+
+      match /blockedUsers/{blockedUserId} {
+        allow read, create, update, delete: if isUser(userId);
+      }
     }
 
     match /things/{thingId} {
@@ -77,6 +81,12 @@ service cloud.firestore {
               .data.participantIds;
         allow update, delete: if false;
       }
+    }
+
+    match /reports/{reportId} {
+      allow create: if signedIn()
+        && request.resource.data.reporterId == request.auth.uid;
+      allow read, update, delete: if false;
     }
 
     match /listings/{listingId} {
