@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/location/location_service.dart';
+import '../../../core/safety/safety_repository.dart';
 import '../../chat/data/chat_repository.dart';
 import '../../inventory/data/thing_repository.dart';
 import '../../inventory/domain/thing.dart';
@@ -20,8 +23,11 @@ class _ExploreScreenState extends State<ExploreScreen> {
   final _repository = ThingRepository();
   final _profileRepository = UserProfileRepository();
   final _chatRepository = ChatRepository();
+  final _safetyRepository = SafetyRepository();
   final _searchController = TextEditingController();
+  StreamSubscription<Set<String>>? _blockedSubscription;
 
+  Set<String> _blockedUserIds = <String>{};
   Map<String, double>? _searchLocation;
   bool _loadingLocation = true;
   bool _startingChat = false;
@@ -31,11 +37,16 @@ class _ExploreScreenState extends State<ExploreScreen> {
   void initState() {
     super.initState();
     _loadSavedLocation();
+    _blockedSubscription =
+        _safetyRepository.watchBlockedUserIds().listen((blocked) {
+      if (mounted) setState(() => _blockedUserIds = blocked);
+    });
     _searchController.addListener(_refresh);
   }
 
   @override
   void dispose() {
+    _blockedSubscription?.cancel();
     _searchController
       ..removeListener(_refresh)
       ..dispose();
@@ -112,6 +123,27 @@ class _ExploreScreenState extends State<ExploreScreen> {
     }
   }
 
+  Future<void> _reportThing(Thing thing) async {
+    await _safetyRepository.reportThing(
+      thingId: thing.id,
+      ownerId: thing.ownerId,
+    );
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Listing reported to Keepi.')),
+      );
+    }
+  }
+
+  Future<void> _blockOwner(Thing thing) async {
+    await _safetyRepository.blockUser(thing.ownerId);
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('User blocked.')),
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -146,6 +178,7 @@ class _ExploreScreenState extends State<ExploreScreen> {
 
           final results = things
               .where((thing) => thing.ownerId != currentUid)
+              .where((thing) => !_blockedUserIds.contains(thing.ownerId))
               .where((thing) {
                 if (query.isEmpty) return true;
                 final haystack = [
@@ -277,6 +310,8 @@ class _ExploreScreenState extends State<ExploreScreen> {
                     child: _PublicThingCard(
                       entry: entry,
                       onMessage: () => _messageOwner(entry.thing),
+                      onReport: () => _reportThing(entry.thing),
+                      onBlock: () => _blockOwner(entry.thing),
                     ),
                   ),
                 ),
@@ -320,10 +355,14 @@ class _PublicThingCard extends StatelessWidget {
   const _PublicThingCard({
     required this.entry,
     required this.onMessage,
+    required this.onReport,
+    required this.onBlock,
   });
 
   final _NearbyThing entry;
   final VoidCallback onMessage;
+  final VoidCallback onReport;
+  final VoidCallback onBlock;
 
   @override
   Widget build(BuildContext context) {
@@ -391,10 +430,36 @@ class _PublicThingCard extends StatelessWidget {
                         .toList(),
                   ),
                   const SizedBox(height: 8),
-                  OutlinedButton.icon(
-                    onPressed: onMessage,
-                    icon: const Icon(Icons.chat_bubble_outline, size: 18),
-                    label: const Text('Message owner'),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: OutlinedButton.icon(
+                          onPressed: onMessage,
+                          icon: const Icon(
+                            Icons.chat_bubble_outline,
+                            size: 18,
+                          ),
+                          label: const Text('Message owner'),
+                        ),
+                      ),
+                      PopupMenuButton<String>(
+                        tooltip: 'Listing safety',
+                        onSelected: (value) {
+                          if (value == 'report') onReport();
+                          if (value == 'block') onBlock();
+                        },
+                        itemBuilder: (context) => const [
+                          PopupMenuItem(
+                            value: 'report',
+                            child: Text('Report listing'),
+                          ),
+                          PopupMenuItem(
+                            value: 'block',
+                            child: Text('Block owner'),
+                          ),
+                        ],
+                      ),
+                    ],
                   ),
                 ],
               ),
