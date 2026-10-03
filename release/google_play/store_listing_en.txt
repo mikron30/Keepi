@@ -1,0 +1,24 @@
+App name
+Keepi
+
+Short description
+Scan, organize and get more value from the things you already own
+
+Full description
+Keepi helps you know what you own, where it is, and what you can do with it.
+
+Take a photo or choose one from your library and Keepi uses AI to identify the item, suggest a category, description and estimated value, then save it to your personal inventory.
+
+With Keepi you can:
+• Manage a personal inventory of almost anything
+• Scan one item or multiple items from a single photo
+• Save photos, descriptions, condition, estimated value and expiry dates
+• Keep items private or offer them for sale, rent, lending, exchange or giveaway
+• Discover relevant nearby items using a location you choose to save
+• Message other users
+• Report content or users and block users
+• Manage privacy and request account/data deletion
+
+Keepi is intended for adults aged 18 and over.
+
+AI-generated recognition, prices, condition estimates and expiry-date readings are estimates only and should be verified before you rely on them.
