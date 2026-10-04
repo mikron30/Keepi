@@ -50,11 +50,52 @@ if ($head -ne $origin) {
     throw "Local Keepi is not origin/main. Run git pull first."
 }
 
-$dirty = git status --porcelain --untracked-files=no
-if ($dirty) {
-    Write-Host "Tracked local changes:" -ForegroundColor Red
+# Native icons are generated build artifacts in this repository. Previous
+# setup/build runs may leave only these tracked PNGs modified. Restore them
+# before the clean-repository safety check; they are regenerated below.
+$trackedChanges = @(git status --porcelain --untracked-files=no)
+$generatedIconChanges = @()
+$realChanges = @()
+
+foreach ($line in $trackedChanges) {
+    if ($line.Length -lt 4) { continue }
+
+    $changedPath = $line.Substring(3).Trim().Trim('"')
+    $isGeneratedIcon =
+        $changedPath -eq "assets/images/keepi_icon.png" -or
+        ($changedPath -like "android/app/src/main/res/mipmap-*/ic_launcher*.png") -or
+        ($changedPath -like "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-*.png")
+
+    if ($isGeneratedIcon) {
+        $generatedIconChanges += $changedPath
+    } else {
+        $realChanges += $line
+    }
+}
+
+if ($generatedIconChanges.Count -gt 0) {
+    Write-Host "Restoring generated launcher icon files from previous builds..." -ForegroundColor Cyan
+    foreach ($generatedPath in $generatedIconChanges) {
+        git restore -- "$generatedPath"
+        if ($LASTEXITCODE -ne 0) {
+            throw "Could not restore generated icon file: $generatedPath"
+        }
+    }
+}
+
+$dirty = @(git status --porcelain --untracked-files=no)
+if ($dirty.Count -gt 0) {
+    Write-Host "Tracked local changes that are NOT generated icons:" -ForegroundColor Red
     $dirty | Out-Host
-    throw "Restore or commit tracked local changes before building."
+    throw "Restore or commit the tracked local changes above before building."
+}
+
+# Flutter/Gradle release builds need several GB of temporary working space.
+$projectDrive = (Get-Item $ProjectPath).PSDrive
+$freeGb = [math]::Round($projectDrive.Free / 1GB, 1)
+Write-Host "Free disk space on $($projectDrive.Name): $freeGb GB" -ForegroundColor Cyan
+if ($projectDrive.Free -lt 6GB) {
+    throw "Not enough free disk space. Keep at least 6 GB free before building Keepi. The screenshot also showed 'No space left on device'."
 }
 
 $versionLine = (Get-Content (Join-Path $ProjectPath "pubspec.yaml") |
