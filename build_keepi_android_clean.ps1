@@ -52,7 +52,12 @@ if ($LASTEXITCODE -ne 0) { throw "flutter analyze failed." }
 flutter.bat test | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "flutter test failed." }
 
-flutter.bat build appbundle --release | Out-Host
+$firebaseDefines = @(dart.bat run "tool\print_firebase_defines.dart" android)
+if ($LASTEXITCODE -ne 0 -or $firebaseDefines.Count -lt 4) {
+    throw "Could not read Android Firebase configuration."
+}
+
+flutter.bat build appbundle --release @firebaseDefines | Out-Host
 if ($LASTEXITCODE -ne 0) { throw "AAB build failed." }
 
 $aab = Join-Path $ProjectPath "build\app\outputs\bundle\release\app-release.aab"
