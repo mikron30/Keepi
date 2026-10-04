@@ -58,6 +58,13 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
+
+            // Flutter release builds are processed by R8. Keep our explicit
+            // reflection rules in addition to rules shipped by dependencies.
+            proguardFiles(
+                getDefaultProguardFile("proguard-android-optimize.txt"),
+                "proguard-rules.pro",
+            )
         }
     }
 }
@@ -65,6 +72,14 @@ kotlin {
     compilerOptions {
         jvmTarget = org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17
     }
+}
+
+dependencies {
+    // google_mobile_ads currently pulls very old WorkManager/Room versions
+    // transitively. Those crash at process startup under AGP 9 / R8 strict
+    // full mode before Flutter's main() can run.
+    implementation("androidx.work:work-runtime:2.12.0")
+    implementation("androidx.room:room-runtime:2.8.5")
 }
 
 flutter {
