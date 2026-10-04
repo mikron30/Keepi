@@ -6,6 +6,11 @@ on:
   push:
     branches:
       - main
+
+concurrency:
+  group: keepi-mobile-${{ github.ref }}
+  cancel-in-progress: true
+
     paths:
       - 'lib/**'
       - 'android/**'
