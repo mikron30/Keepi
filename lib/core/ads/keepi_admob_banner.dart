@@ -2,8 +2,6 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 
-import '../runtime/keepi_runtime.dart';
-
 class KeepiAdMobBanner extends StatefulWidget {
   const KeepiAdMobBanner({super.key});
 
@@ -32,7 +30,6 @@ class _KeepiAdMobBannerState extends State<KeepiAdMobBanner> {
   bool _loaded = false;
 
   bool get _supported =>
-      !KeepiRuntime.diagnosticSafeMode &&
       !kIsWeb &&
       (defaultTargetPlatform == TargetPlatform.android ||
           defaultTargetPlatform == TargetPlatform.iOS);
