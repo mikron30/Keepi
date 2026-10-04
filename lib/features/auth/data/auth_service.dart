@@ -3,6 +3,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 
+import '../../../core/platform/android_signing_info.dart';
+
 class AuthService {
   AuthService({
     FirebaseAuth? auth,
@@ -82,7 +84,24 @@ class AuthService {
       _googleInitialized = true;
     }
 
-    final googleUser = await GoogleSignIn.instance.authenticate();
+    GoogleSignInAccount googleUser;
+    try {
+      googleUser = await GoogleSignIn.instance.authenticate();
+    } on GoogleSignInException catch (error) {
+      if (defaultTargetPlatform == TargetPlatform.android &&
+          error.code == GoogleSignInExceptionCode.canceled &&
+          error.description?.contains('[16]') == true) {
+        final sha1 = await AndroidSigningInfo.sha1();
+        throw FirebaseAuthException(
+          code: 'google-android-reauth-failed',
+          message: sha1 == null
+              ? 'Google account reauthentication failed. Verify the Google Play App Signing SHA-1 in Firebase.'
+              : 'Google account reauthentication failed. Add this installed-app SHA-1 to Firebase: $sha1',
+        );
+      }
+      rethrow;
+    }
+
     final googleAuth = googleUser.authentication;
     final idToken = googleAuth.idToken;
 
