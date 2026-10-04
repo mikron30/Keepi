@@ -50,7 +50,18 @@ jobs:
       - name: Build APK
         shell: bash
         run: |
-          mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          if [ -f lib/firebase_options.dart ]; then
+            mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          else
+            echo "lib/firebase_options.dart is intentionally not committed; using CI-only dummy Firebase options."
+            FIREBASE_DEFINES=(
+              "--dart-define=FIREBASE_API_KEY=ci-dummy-api-key"
+              "--dart-define=FIREBASE_APP_ID=1:1234567890:android:cidummy"
+              "--dart-define=FIREBASE_MESSAGING_SENDER_ID=1234567890"
+              "--dart-define=FIREBASE_PROJECT_ID=keepi-ci-dummy"
+              "--dart-define=FIREBASE_STORAGE_BUCKET=keepi-ci-dummy.appspot.com"
+            )
+          fi
           flutter build apk --release "${FIREBASE_DEFINES[@]}"
 
       - name: Android emulator smoke test
@@ -97,7 +108,17 @@ jobs:
       - name: Build AAB
         shell: bash
         run: |
-          mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          if [ -f lib/firebase_options.dart ]; then
+            mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          else
+            FIREBASE_DEFINES=(
+              "--dart-define=FIREBASE_API_KEY=ci-dummy-api-key"
+              "--dart-define=FIREBASE_APP_ID=1:1234567890:android:cidummy"
+              "--dart-define=FIREBASE_MESSAGING_SENDER_ID=1234567890"
+              "--dart-define=FIREBASE_PROJECT_ID=keepi-ci-dummy"
+              "--dart-define=FIREBASE_STORAGE_BUCKET=keepi-ci-dummy.appspot.com"
+            )
+          fi
           flutter build appbundle --release "${FIREBASE_DEFINES[@]}"
 
       - name: Upload Android APK
