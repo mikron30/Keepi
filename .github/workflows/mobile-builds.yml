@@ -81,7 +81,7 @@ jobs:
             test -n "$(adb shell ps -A | grep "com.mikron30.keepi" || true)"
             adb shell dumpsys activity activities | grep -q "com.mikron30.keepi/.MainActivity"
             ! grep -qE "FATAL EXCEPTION|Process: com.mikron30.keepi|Fatal signal.*com.mikron30.keepi" keepi-emulator-logcat.txt
-            echo "SMOKE TEST PASS: Keepi 0.1.13 production launcher is alive." | tee -a keepi-emulator-summary.txt
+            echo "SMOKE TEST PASS: Keepi 0.1.14 production launcher is alive." | tee -a keepi-emulator-summary.txt
 
       - name: Upload emulator diagnostics
         if: always()
