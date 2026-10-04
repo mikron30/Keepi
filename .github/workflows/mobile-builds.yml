@@ -76,6 +76,23 @@ jobs:
             echo "=== FATAL / ANDROIDRUNTIME ===" | tee -a keepi-emulator-summary.txt
             grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-emulator-logcat.txt | tail -200 | tee -a keepi-emulator-summary.txt || true
 
+            echo "=== FLUTTER STAGE ===" | tee -a keepi-emulator-summary.txt
+            adb logcat -c || true
+            adb shell am start -W -n com.mikron30.keepi/com.mikron30.keepi.MainActivity || true
+            sleep 10
+            adb logcat -d -v threadtime > keepi-flutter-logcat.txt || true
+
+            echo "=== FLUTTER PROCESS ===" | tee -a keepi-emulator-summary.txt
+            adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
+
+            echo "=== FLUTTER RESUMED ACTIVITY ===" | tee -a keepi-emulator-summary.txt
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|KeepiDiagnosticActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
+
+            echo "=== FLUTTER FATAL / ANDROIDRUNTIME ===" | tee -a keepi-emulator-summary.txt
+            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException|flutter" keepi-flutter-logcat.txt | tail -250 | tee -a keepi-emulator-summary.txt || true
+
+            adb exec-out screencap -p > keepi-flutter-screen.png || true
+
             adb shell uiautomator dump /data/local/tmp/keepi-window.xml || true
             adb pull /data/local/tmp/keepi-window.xml keepi-window.xml || true
 
@@ -93,6 +110,8 @@ jobs:
             keepi-emulator-summary.txt
             keepi-emulator-logcat.txt
             keepi-emulator-screen.png
+            keepi-flutter-screen.png
+            keepi-flutter-logcat.txt
             keepi-window.xml
           if-no-files-found: warn
 
