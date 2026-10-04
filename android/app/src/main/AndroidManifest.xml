@@ -13,18 +13,8 @@
             android:name="com.google.android.gms.ads.APPLICATION_ID"
             android:value="ca-app-pub-6120568543364688~6863921626" />
         <activity
-            android:name="com.mikron30.keepi.KeepiDiagnosticActivity"
-            android:exported="true"
-            android:theme="@android:style/Theme.DeviceDefault.NoActionBar">
-            <intent-filter>
-                <action android:name="android.intent.action.MAIN"/>
-                <category android:name="android.intent.category.LAUNCHER"/>
-            </intent-filter>
-        </activity>
-
-        <activity
             android:name="com.mikron30.keepi.MainActivity"
-            android:exported="false"
+            android:exported="true"
             android:launchMode="singleTop"
             android:taskAffinity=""
             android:theme="@style/LaunchTheme"
@@ -39,6 +29,10 @@
               android:name="io.flutter.embedding.android.NormalTheme"
               android:resource="@style/NormalTheme"
               />
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN"/>
+                <category android:name="android.intent.category.LAUNCHER"/>
+            </intent-filter>
         </activity>
         <!-- Diagnostic build: prevent third-party ContentProviders from
              running before our native diagnostic launcher. Both SDKs are
