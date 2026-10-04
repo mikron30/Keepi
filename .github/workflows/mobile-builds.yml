@@ -54,30 +54,36 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            set +e
-            adb install -r build/app/outputs/flutter-apk/app-release.apk
-            adb logcat -c
-            adb shell am force-stop com.mikron30.keepi
-            adb shell am start -W -n com.mikron30.keepi/com.mikron30.keepi.KeepiDiagnosticActivity
+            adb install -r build/app/outputs/flutter-apk/app-release.apk || true
+            adb logcat -c || true
+            adb shell am force-stop com.mikron30.keepi || true
+            adb shell am start -W -n com.mikron30.keepi/com.mikron30.keepi.KeepiDiagnosticActivity || true
             sleep 8
 
-            echo "=== PROCESS ===" | tee keepi-emulator-summary.txt
-            adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt
+            # Capture the crash log FIRST so later diagnostics cannot hide it.
+            adb logcat -d -v threadtime > keepi-emulator-logcat.txt || true
+            adb exec-out screencap -p > keepi-emulator-screen.png || true
+
+            echo "=== PACKAGE ===" | tee keepi-emulator-summary.txt
+            adb shell dumpsys package com.mikron30.keepi | grep -E "versionName|versionCode|primaryCpuAbi|codePath" | tee -a keepi-emulator-summary.txt || true
+
+            echo "=== PROCESS ===" | tee -a keepi-emulator-summary.txt
+            adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
 
             echo "=== RESUMED ACTIVITY ===" | tee -a keepi-emulator-summary.txt
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|KeepiDiagnosticActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt
-
-            adb shell uiautomator dump /sdcard/keepi-window.xml
-            adb pull /sdcard/keepi-window.xml keepi-window.xml
-
-            echo "=== UI TEXT ===" | tee -a keepi-emulator-summary.txt
-            grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt
-
-            adb exec-out screencap -p > keepi-emulator-screen.png
-            adb logcat -d -v time > keepi-emulator-logcat.txt
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|KeepiDiagnosticActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
 
             echo "=== FATAL / ANDROIDRUNTIME ===" | tee -a keepi-emulator-summary.txt
-            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:" keepi-emulator-logcat.txt | tail -120 | tee -a keepi-emulator-summary.txt
+            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-emulator-logcat.txt | tail -200 | tee -a keepi-emulator-summary.txt || true
+
+            adb shell uiautomator dump /data/local/tmp/keepi-window.xml || true
+            adb pull /data/local/tmp/keepi-window.xml keepi-window.xml || true
+
+            echo "=== UI TEXT ===" | tee -a keepi-emulator-summary.txt
+            if [ -f keepi-window.xml ]; then
+              grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt || true
+            fi
+
             exit 0
 
       - name: Upload emulator diagnostics
