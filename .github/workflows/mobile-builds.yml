@@ -80,9 +80,7 @@ jobs:
             adb pull /data/local/tmp/keepi-window.xml keepi-window.xml || true
 
             echo "=== UI TEXT ===" | tee -a keepi-emulator-summary.txt
-            if [ -f keepi-window.xml ]; then
-              grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt || true
-            fi
+            test ! -f keepi-window.xml || grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt || true
 
             exit 0
 
