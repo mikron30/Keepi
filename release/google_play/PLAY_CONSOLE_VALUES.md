@@ -40,7 +40,7 @@
 - applicationId: com.mikron30.keepi
 - Target SDK: API 36 / Android 16
 - Release signing: upload-keystore.jks
-- Current production-candidate version code: 6
+- Current production-candidate version code: 12
 
 ## Contact
 - Privacy/support email: mikron30@gmail.com
@@ -49,7 +49,7 @@
 1. Publish Firebase Hosting so privacy/terms/deletion/support URLs are live.
 2. Deploy Firestore rules so reports/blocks are allowed.
 3. Configure AdMob Privacy & messaging message for EEA/UK/Switzerland; Keepi now invokes UMP before requesting ads.
-4. Build and upload the signed version-code-6 AAB.
+4. Build and upload the signed version-code-12 AAB.
 5. Create a permanent reviewer login and enter it under App access.
 6. Complete Data safety using DATA_SAFETY.md.
 7. Complete content rating truthfully, including user communication/UGC and ads.
