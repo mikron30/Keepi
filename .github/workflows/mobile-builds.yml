@@ -99,6 +99,47 @@ jobs:
             echo "=== UI TEXT ===" | tee -a keepi-emulator-summary.txt
             test ! -f keepi-window.xml || grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt || true
 
+            echo "=== FLUTTER STARTUP TEST ===" | tee -a keepi-emulator-summary.txt
+
+            # The emulator can occasionally show its own System UI ANR dialog.
+            # Select "Wait" and continue; this is not a Keepi crash.
+            adb shell input tap 540 1332 || true
+            sleep 2
+
+            adb shell uiautomator dump /data/local/tmp/keepi-native.xml || true
+            adb pull /data/local/tmp/keepi-native.xml keepi-native.xml || true
+
+            if [ -f keepi-native.xml ] && grep -q "START FLUTTER DIAGNOSTICS" keepi-native.xml; then
+              bounds=$(grep -o 'text="START FLUTTER DIAGNOSTICS"[^>]*bounds="\[[0-9,]*\]\[[0-9,]*\]"' keepi-native.xml | head -1 | grep -o 'bounds="[^"]*"' | cut -d'"' -f2)
+              coords=$(echo "$bounds" | tr -d '[]' | tr ',' ' ' | tr '][' ' ')
+              set -- $coords
+              x=$(( ($1 + $3) / 2 ))
+              y=$(( ($2 + $4) / 2 ))
+
+              adb logcat -c || true
+              adb shell input tap "$x" "$y" || true
+              sleep 12
+
+              adb logcat -d -v threadtime > keepi-flutter-logcat.txt || true
+              adb exec-out screencap -p > keepi-flutter-screen.png || true
+              adb shell uiautomator dump /data/local/tmp/keepi-flutter.xml || true
+              adb pull /data/local/tmp/keepi-flutter.xml keepi-flutter.xml || true
+
+              echo "--- Flutter process ---" | tee -a keepi-emulator-summary.txt
+              adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
+
+              echo "--- Flutter resumed activity ---" | tee -a keepi-emulator-summary.txt
+              adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|MainActivity|KeepiDiagnosticActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
+
+              echo "--- Flutter fatal lines ---" | tee -a keepi-emulator-summary.txt
+              grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-flutter-logcat.txt | tail -200 | tee -a keepi-emulator-summary.txt || true
+
+              echo "--- Flutter UI text ---" | tee -a keepi-emulator-summary.txt
+              test ! -f keepi-flutter.xml || grep -o 'text="[^"]*"' keepi-flutter.xml | tee -a keepi-emulator-summary.txt || true
+            else
+              echo "Could not find START FLUTTER DIAGNOSTICS button." | tee -a keepi-emulator-summary.txt
+            fi
+
             exit 0
 
       - name: Upload emulator diagnostics
@@ -113,6 +154,10 @@ jobs:
             keepi-flutter-screen.png
             keepi-flutter-logcat.txt
             keepi-window.xml
+            keepi-native.xml
+            keepi-flutter-logcat.txt
+            keepi-flutter-screen.png
+            keepi-flutter.xml
           if-no-files-found: warn
 
       - name: Build AAB
