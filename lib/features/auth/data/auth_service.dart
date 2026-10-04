@@ -15,6 +15,10 @@ class AuthService {
 
   static bool _googleInitialized = false;
 
+  static const String _googleServerClientId = String.fromEnvironment(
+    'KEEPI_GOOGLE_SERVER_CLIENT_ID',
+  );
+
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   User? get currentUser => _auth.currentUser;
@@ -70,7 +74,11 @@ class AuthService {
     }
 
     if (!_googleInitialized) {
-      await GoogleSignIn.instance.initialize();
+      await GoogleSignIn.instance.initialize(
+        serverClientId: _googleServerClientId.isEmpty
+            ? null
+            : _googleServerClientId,
+      );
       _googleInitialized = true;
     }
 
