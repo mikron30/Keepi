@@ -1,6 +1,7 @@
 package com.mikron30.keepi
 
 import android.content.pm.PackageManager
+import android.content.pm.Signature
 import android.os.Build
 import io.flutter.embedding.android.FlutterActivity
 import io.flutter.embedding.engine.FlutterEngine
@@ -37,23 +38,28 @@ class MainActivity : FlutterActivity() {
     }
 
     private fun readSigningSha1(): String {
-        val signatures = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-            val info = packageManager.getPackageInfo(
-                packageName,
-                PackageManager.GET_SIGNING_CERTIFICATES,
-            ).signingInfo
-            if (info.hasMultipleSigners()) {
-                info.apkContentsSigners
+        val signatures: Array<out Signature> =
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                val info = packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.GET_SIGNING_CERTIFICATES,
+                ).signingInfo
+                    ?: throw IllegalStateException(
+                        "No Android signing information found.",
+                    )
+
+                if (info.hasMultipleSigners()) {
+                    info.apkContentsSigners.orEmpty()
+                } else {
+                    info.signingCertificateHistory.orEmpty()
+                }
             } else {
-                info.signingCertificateHistory
+                @Suppress("DEPRECATION")
+                packageManager.getPackageInfo(
+                    packageName,
+                    PackageManager.GET_SIGNATURES,
+                ).signatures.orEmpty()
             }
-        } else {
-            @Suppress("DEPRECATION")
-            packageManager.getPackageInfo(
-                packageName,
-                PackageManager.GET_SIGNATURES,
-            ).signatures
-        }
 
         val certificate = signatures.firstOrNull()
             ?: throw IllegalStateException("No signing certificate found.")
