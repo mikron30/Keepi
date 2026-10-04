@@ -21,7 +21,7 @@
 - [x] Reviewer-access instructions
 - [x] Release notes
 - [x] Play Store asset export script
-- [x] Production candidate version code 6
+- [x] Production candidate version code 12
 
 ## Run on the Windows build machine
 1. git pull
