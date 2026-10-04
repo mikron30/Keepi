@@ -61,10 +61,11 @@ foreach ($line in $trackedChanges) {
     if ($line.Length -lt 4) { continue }
 
     $changedPath = $line.Substring(3).Trim().Trim('"')
-    $isGeneratedIcon =
+    $isGeneratedIcon = (
         $changedPath -eq "assets/images/keepi_icon.png" -or
         ($changedPath -like "android/app/src/main/res/mipmap-*/ic_launcher*.png") -or
         ($changedPath -like "ios/Runner/Assets.xcassets/AppIcon.appiconset/Icon-App-*.png")
+    )
 
     if ($isGeneratedIcon) {
         $generatedIconChanges += $changedPath
