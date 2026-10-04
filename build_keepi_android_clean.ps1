@@ -72,6 +72,3 @@ Write-Host "VERIFIED BUILD COMPLETE" -ForegroundColor Green
 Write-Host "Git commit: $head" -ForegroundColor Yellow
 Write-Host $versionLine -ForegroundColor Yellow
 Write-Host "AAB: $aab" -ForegroundColor Yellow
-Write-Host ""
-Write-Host "Expected first screen after install:" -ForegroundColor Cyan
-Write-Host "KEEPI VERSION 10 - NATIVE CHECK PASSED" -ForegroundColor Cyan
