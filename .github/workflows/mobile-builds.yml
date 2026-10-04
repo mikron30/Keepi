@@ -44,7 +44,10 @@ jobs:
         run: flutter test
 
       - name: Build APK
-        run: flutter build apk --release
+        shell: bash
+        run: |
+          mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          flutter build apk --release "${FIREBASE_DEFINES[@]}"
 
       - name: Android emulator smoke test
         uses: reactivecircus/android-emulator-runner@v2
@@ -54,93 +57,46 @@ jobs:
           profile: pixel_6
           disable-animations: true
           script: |
-            adb install -r build/app/outputs/flutter-apk/app-release.apk || true
-            adb logcat -c || true
-            adb shell am force-stop com.mikron30.keepi || true
-            adb shell am start -W -n com.mikron30.keepi/com.mikron30.keepi.KeepiDiagnosticActivity || true
-            sleep 8
-
-            # Capture the crash log FIRST so later diagnostics cannot hide it.
-            adb logcat -d -v threadtime > keepi-emulator-logcat.txt || true
-            adb exec-out screencap -p > keepi-emulator-screen.png || true
+            adb install -r build/app/outputs/flutter-apk/app-release.apk
+            adb logcat -c
+            adb shell am force-stop com.mikron30.keepi
 
             echo "=== PACKAGE ===" | tee keepi-emulator-summary.txt
             adb shell dumpsys package com.mikron30.keepi | grep -E "versionName|versionCode|primaryCpuAbi|codePath" | tee -a keepi-emulator-summary.txt || true
 
+            echo "=== START PRODUCTION LAUNCHER ===" | tee -a keepi-emulator-summary.txt
+            adb shell monkey -p com.mikron30.keepi -c android.intent.category.LAUNCHER 1 | tee -a keepi-emulator-summary.txt
+            sleep 15
+
+            adb logcat -d -v threadtime > keepi-emulator-logcat.txt || true
+            adb exec-out screencap -p > keepi-emulator-screen.png || true
+
             echo "=== PROCESS ===" | tee -a keepi-emulator-summary.txt
-            adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
+            PID="$(adb shell pidof com.mikron30.keepi | tr -d '\r')"
+            echo "$PID" | tee -a keepi-emulator-summary.txt
 
             echo "=== RESUMED ACTIVITY ===" | tee -a keepi-emulator-summary.txt
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|KeepiDiagnosticActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
+            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
 
             echo "=== FATAL / ANDROIDRUNTIME ===" | tee -a keepi-emulator-summary.txt
-            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-emulator-logcat.txt | tail -200 | tee -a keepi-emulator-summary.txt || true
+            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-emulator-logcat.txt | tail -250 | tee -a keepi-emulator-summary.txt || true
 
-            echo "=== FLUTTER STAGE ===" | tee -a keepi-emulator-summary.txt
-            adb logcat -c || true
-            adb shell am start -W -n com.mikron30.keepi/com.mikron30.keepi.MainActivity || true
-            sleep 10
-            adb logcat -d -v threadtime > keepi-flutter-logcat.txt || true
-
-            echo "=== FLUTTER PROCESS ===" | tee -a keepi-emulator-summary.txt
-            adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
-
-            echo "=== FLUTTER RESUMED ACTIVITY ===" | tee -a keepi-emulator-summary.txt
-            adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|KeepiDiagnosticActivity|MainActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
-
-            echo "=== FLUTTER FATAL / ANDROIDRUNTIME ===" | tee -a keepi-emulator-summary.txt
-            grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|Unable to instantiate|Unable to start activity|ClassNotFoundException|UnsatisfiedLinkError|SecurityException|flutter" keepi-flutter-logcat.txt | tail -250 | tee -a keepi-emulator-summary.txt || true
-
-            adb exec-out screencap -p > keepi-flutter-screen.png || true
-
-            adb shell uiautomator dump /data/local/tmp/keepi-window.xml || true
-            adb pull /data/local/tmp/keepi-window.xml keepi-window.xml || true
-
-            echo "=== UI TEXT ===" | tee -a keepi-emulator-summary.txt
-            test ! -f keepi-window.xml || grep -o 'text="[^"]*"' keepi-window.xml | tee -a keepi-emulator-summary.txt || true
-
-            echo "=== FLUTTER STARTUP TEST ===" | tee -a keepi-emulator-summary.txt
-
-            # The emulator can occasionally show its own System UI ANR dialog.
-            # Select "Wait" and continue; this is not a Keepi crash.
-            adb shell input tap 540 1332 || true
-            sleep 2
-
-            adb shell uiautomator dump /data/local/tmp/keepi-native.xml || true
-            adb pull /data/local/tmp/keepi-native.xml keepi-native.xml || true
-
-            if [ -f keepi-native.xml ] && grep -q "START FLUTTER DIAGNOSTICS" keepi-native.xml; then
-              bounds=$(grep -o 'text="START FLUTTER DIAGNOSTICS"[^>]*bounds="\[[0-9,]*\]\[[0-9,]*\]"' keepi-native.xml | head -1 | grep -o 'bounds="[^"]*"' | cut -d'"' -f2)
-              coords=$(echo "$bounds" | sed -E 's/\[([0-9]+),([0-9]+)\]\[([0-9]+),([0-9]+)\]/\1 \2 \3 \4/')
-              set -- $coords
-              x=$(( ($1 + $3) / 2 ))
-              y=$(( ($2 + $4) / 2 ))
-
-              adb logcat -c || true
-              adb shell input tap "$x" "$y" || true
-              sleep 12
-
-              adb logcat -d -v threadtime > keepi-flutter-logcat.txt || true
-              adb exec-out screencap -p > keepi-flutter-screen.png || true
-              adb shell uiautomator dump /data/local/tmp/keepi-flutter.xml || true
-              adb pull /data/local/tmp/keepi-flutter.xml keepi-flutter.xml || true
-
-              echo "--- Flutter process ---" | tee -a keepi-emulator-summary.txt
-              adb shell pidof com.mikron30.keepi | tee -a keepi-emulator-summary.txt || true
-
-              echo "--- Flutter resumed activity ---" | tee -a keepi-emulator-summary.txt
-              adb shell dumpsys activity activities | grep -E "mResumedActivity|topResumedActivity|MainActivity|KeepiDiagnosticActivity" | tail -30 | tee -a keepi-emulator-summary.txt || true
-
-              echo "--- Flutter fatal lines ---" | tee -a keepi-emulator-summary.txt
-              grep -E "FATAL EXCEPTION|AndroidRuntime|Process: com.mikron30.keepi|Caused by:|ClassNotFoundException|UnsatisfiedLinkError|SecurityException" keepi-flutter-logcat.txt | tail -200 | tee -a keepi-emulator-summary.txt || true
-
-              echo "--- Flutter UI text ---" | tee -a keepi-emulator-summary.txt
-              test ! -f keepi-flutter.xml || grep -o 'text="[^"]*"' keepi-flutter.xml | tee -a keepi-emulator-summary.txt || true
-            else
-              echo "Could not find START FLUTTER DIAGNOSTICS button." | tee -a keepi-emulator-summary.txt
+            if [ -z "$PID" ]; then
+              echo "ERROR: Keepi process is not alive after startup." | tee -a keepi-emulator-summary.txt
+              exit 21
             fi
 
-            exit 0
+            if grep -qE "FATAL EXCEPTION.*|Process: com.mikron30.keepi" keepi-emulator-logcat.txt; then
+              echo "ERROR: Keepi fatal crash detected." | tee -a keepi-emulator-summary.txt
+              exit 22
+            fi
+
+            if ! adb shell dumpsys activity activities | grep -q "com.mikron30.keepi/.MainActivity"; then
+              echo "ERROR: Keepi MainActivity is not active." | tee -a keepi-emulator-summary.txt
+              exit 23
+            fi
+
+            echo "SMOKE TEST PASS: Keepi production launcher is alive." | tee -a keepi-emulator-summary.txt
 
       - name: Upload emulator diagnostics
         if: always()
@@ -151,8 +107,6 @@ jobs:
             keepi-emulator-summary.txt
             keepi-emulator-logcat.txt
             keepi-emulator-screen.png
-            keepi-flutter-screen.png
-            keepi-flutter-logcat.txt
             keepi-window.xml
             keepi-native.xml
             keepi-flutter-logcat.txt
@@ -161,7 +115,10 @@ jobs:
           if-no-files-found: warn
 
       - name: Build AAB
-        run: flutter build appbundle --release
+        shell: bash
+        run: |
+          mapfile -t FIREBASE_DEFINES < <(dart run tool/print_firebase_defines.dart android)
+          flutter build appbundle --release "${FIREBASE_DEFINES[@]}"
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
